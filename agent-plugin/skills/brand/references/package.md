@@ -27,7 +27,7 @@ Put `tokens`, `fonts` and `assets` in `install` when other brands will extend th
 
 - Type: one family per role (body, display, mono) and the scale largest first. Sizes in rem.
 - Spacing and radius: a short scale (five to eight steps) taken from what the sources actually use; collect the values from their CSS rather than inventing a progression.
-- Contrast pairs: declare every text-on-surface pair the UI uses, each with its minimum (4.5 for body text, 3 for large text and UI parts) and a one-line use. `check` only checks what is declared.
+- Contrast pairs: declare every text-on-surface pair the UI uses, each with its minimum (4.5 for body text, 3 for large text and UI parts) and a one-line use. `check` also tests every DaisyUI colour under its `-content` colour, and `base-content` on `base-100`, in each theme at 4.5:1 without being told; declare those only to change the minimum (`daisyui:accent-content` on `daisyui:accent`, `min` 3 for a large-type-only accent). A pair whose tokens differ by theme can name `daisyui:<colour>` instead of a helper token.
 
 ## The conflict and gap list
 

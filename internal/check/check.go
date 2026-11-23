@@ -89,11 +89,12 @@ func Errors(fs []Finding) int {
 }
 
 func (c *checker) contrast(r *brand.Rules) {
-	if len(r.Contrast) == 0 {
+	pairs := build.ContrastPairs(c.b, r)
+	if len(pairs) == 0 {
 		c.add("contrast", "warning", "", "the brand declares no contrast pairs")
 	}
 	for _, th := range c.b.Themes {
-		for _, p := range r.Contrast {
+		for _, p := range pairs {
 			if p.Min < 1 || p.Min > 21 {
 				c.add("contrast", "error", th.Name, "%s on %s: minimum %v isn't a WCAG ratio (1 to 21)", p.FG, p.BG, p.Min)
 				continue
@@ -104,7 +105,8 @@ func (c *checker) contrast(r *brand.Rules) {
 				continue
 			}
 			if ratio+1e-9 < p.Min {
-				c.add("contrast", "error", th.Name, "%s on %s is %.2f:1, below %s:1 (%s)", p.FG, p.BG, ratio, brand.Num(p.Min), p.Use)
+				c.add("contrast", "error", th.Name, "%s on %s is %.2f:1, below %s:1 (%s)",
+					build.PairName(th, p.FG), build.PairName(th, p.BG), ratio, brand.Num(p.Min), p.Use)
 			}
 		}
 	}

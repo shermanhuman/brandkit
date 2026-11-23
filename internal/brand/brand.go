@@ -387,7 +387,9 @@ type IconRule struct {
 	Examples    []string `json:"examples,omitempty"`
 }
 
-// ContrastPair is a foreground/background pair and its minimum ratio.
+// ContrastPair is a foreground/background pair and its minimum ratio. FG
+// and BG are colour token paths, or daisyui:<colour> for the token each
+// theme's DaisyUI mapping gives that colour.
 type ContrastPair struct {
 	FG  string  `json:"fg"`
 	BG  string  `json:"bg"`

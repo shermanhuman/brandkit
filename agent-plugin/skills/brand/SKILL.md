@@ -61,7 +61,7 @@ Apply the answers, then:
 
 ```sh
 brandkit build        # writes export/ and README.md; commit both
-brandkit check        # schema, contrast of every declared pair, brand rules
+brandkit check        # schema, contrast of every declared pair and DaisyUI -content pair, brand rules
 ```
 
 Step 4 is done when every row of the conflict and gap list has a recorded answer, no `"TODO"` is left, and `check` reports no errors. `check` exits 0 with warnings (no lockup, no icon set, a font the package doesn't ship), so read them: each is either fixed or a gap with a recorded answer. A contrast failure is fixed by moving the failing colour along its own hue in OKLCH, or by pairing it with a different content colour. If the fix visibly changes a colour the user chose, show them the before and after and ask; don't ship a silent change to their answer.

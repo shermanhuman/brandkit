@@ -136,3 +136,68 @@ func TestTodoPlaceholders(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// dayNeutralFails gives day alone a neutral-content (color.surface) that
+// fails on its neutral (color.border), through day's own DaisyUI mapping.
+func dayNeutralFails(t *testing.T) string {
+	t.Helper()
+	dir := copyDir(t, filepath.Join("..", "..", "testdata", "brands", "base"))
+	edit(t, filepath.Join(dir, "tokens", "day.tokens.json"), `"$description": "Fixture base brand: day roles.",`,
+		`"$description": "Fixture base brand: day roles.",
+  "$extensions": {"com.mapleset.daisyui": {"colors": {"neutral-content": "{color.surface}"}}},`)
+	return dir
+}
+
+func contrastErrors(fs []Finding) []Finding {
+	var out []Finding
+	for _, f := range fs {
+		if f.Rule == "contrast" && f.Severity == "error" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// TestDaisyPairsPerTheme: every DaisyUI -content pair is checked in each
+// theme against that theme's own mapping, with no pair declared (brandkit#3).
+func TestDaisyPairsPerTheme(t *testing.T) {
+	b, err := brand.Load(dayNeutralFails(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	errs := contrastErrors(Brand(b))
+	if len(errs) != 1 {
+		t.Fatalf("want one contrast error (day), got %v", errs)
+	}
+	f := errs[0]
+	want := "daisyui:neutral-content (color.surface) on daisyui:neutral (color.border) is 1."
+	if f.Theme != "day" || !strings.Contains(f.Message, want) || !strings.Contains(f.Message, "below 4.5:1") {
+		t.Errorf("got %s, want a day error containing %q", f, want)
+	}
+}
+
+// TestDeclaredDaisyPair: a declared daisyui: pair resolves per theme and
+// replaces the automatic pair with its own minimum.
+func TestDeclaredDaisyPair(t *testing.T) {
+	dir := dayNeutralFails(t)
+	edit(t, filepath.Join(dir, "tokens", "semantic.tokens.json"), `"contrast": [`, `"contrast": [
+        {"fg": "daisyui:neutral-content", "bg": "daisyui:neutral", "min": 1, "use": "decoration only"},
+        {"fg": "daisyui:accent-content", "bg": "daisyui:accent", "min": 7, "use": "accent buttons, raised"},
+        {"fg": "daisyui:nope", "bg": "color.bg", "min": 3, "use": "typo"},`)
+	b, err := brand.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, f := range contrastErrors(Brand(b)) {
+		got = append(got, f.String())
+	}
+	want := []string{
+		"error contrast [night]: theme night: contrast pair daisyui:nope on color.bg: daisyui:nope isn't a DaisyUI colour",
+		"error contrast [day]: daisyui:accent-content (color.on-accent) on daisyui:accent (color.accent) is 5.76:1, below 7:1 (accent buttons, raised)",
+		"error contrast [day]: theme day: contrast pair daisyui:nope on color.bg: daisyui:nope isn't a DaisyUI colour",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}

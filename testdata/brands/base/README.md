@@ -61,7 +61,7 @@ Roles first: use these, through the DaisyUI classes (`bg-base-100`, `text-base-c
 
 ### Contrast
 
-Every pair the brand declares, by the WCAG 2.x ratio (`brandkit check` fails below the minimum).
+Every pair the brand declares, then the pairs brandkit adds itself: each DaisyUI colour's `-content` text on it, and `base-content` on `base-100`. Ratios are WCAG 2.x; `brandkit check` fails below the minimum. A `daisyui:` colour is whichever token that theme's DaisyUI mapping gives it, named under the ratio.
 
 | Text | On | Use | Minimum | Night | Day |
 |---|---|---|---|---|---|
@@ -78,9 +78,18 @@ Every pair the brand declares, by the WCAG 2.x ratio (`brandkit check` fails bel
 | `color.on-status` | `color.danger` | error alerts | 4.5:1 | 8.38:1 passes | 6.32:1 passes |
 | `color.on-status` | `color.info` | info alerts | 4.5:1 | 11.04:1 passes | 6.94:1 passes |
 | `color.focus` | `color.bg` | focus ring | 3:1 | 13.73:1 passes | 6.18:1 passes |
+| `daisyui:base-content` | `daisyui:base-100` | DaisyUI base-content on base-100, added by brandkit | 4.5:1 | 18.28:1 passes<br><sub>`color.text` on `color.bg`</sub> | 18.28:1 passes<br><sub>`color.text` on `color.bg`</sub> |
+| `daisyui:primary-content` | `daisyui:primary` | DaisyUI primary-content on primary, added by brandkit | 4.5:1 | 11.45:1 passes<br><sub>`color.on-primary` on `color.primary`</sub> | 6.18:1 passes<br><sub>`color.on-primary` on `color.primary`</sub> |
+| `daisyui:secondary-content` | `daisyui:secondary` | DaisyUI secondary-content on secondary, added by brandkit | 4.5:1 | 11.45:1 passes<br><sub>`color.on-primary` on `color.link`</sub> | 6.18:1 passes<br><sub>`color.on-primary` on `color.link`</sub> |
+| `daisyui:accent-content` | `daisyui:accent` | DaisyUI accent-content on accent, added by brandkit | 4.5:1 | 9.14:1 passes<br><sub>`color.on-accent` on `color.accent`</sub> | 5.76:1 passes<br><sub>`color.on-accent` on `color.accent`</sub> |
+| `daisyui:neutral-content` | `daisyui:neutral` | DaisyUI neutral-content on neutral, added by brandkit | 4.5:1 | 10.31:1 passes<br><sub>`color.text` on `color.border`</sub> | 9.59:1 passes<br><sub>`color.text` on `color.border`</sub> |
+| `daisyui:info-content` | `daisyui:info` | DaisyUI info-content on info, added by brandkit | 4.5:1 | 11.04:1 passes<br><sub>`color.on-status` on `color.info`</sub> | 6.94:1 passes<br><sub>`color.on-status` on `color.info`</sub> |
+| `daisyui:success-content` | `daisyui:success` | DaisyUI success-content on success, added by brandkit | 4.5:1 | 11.93:1 passes<br><sub>`color.on-status` on `color.success`</sub> | 7.35:1 passes<br><sub>`color.on-status` on `color.success`</sub> |
+| `daisyui:warning-content` | `daisyui:warning` | DaisyUI warning-content on warning, added by brandkit | 4.5:1 | 13.73:1 passes<br><sub>`color.on-status` on `color.warning`</sub> | 6.68:1 passes<br><sub>`color.on-status` on `color.warning`</sub> |
+| `daisyui:error-content` | `daisyui:error` | DaisyUI error-content on error, added by brandkit | 4.5:1 | 8.38:1 passes<br><sub>`color.on-status` on `color.danger`</sub> | 6.32:1 passes<br><sub>`color.on-status` on `color.danger`</sub> |
 
 <details>
-<summary>The full palette (20 colours)</summary>
+<summary>Other colours: 20 tokens not in the roles table</summary>
 
 | Token | CSS | Night | Day |
 |---|---|---|---|

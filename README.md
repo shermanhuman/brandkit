@@ -3,7 +3,7 @@
 brandkit turns a brand defined as [DTCG 2025.10](https://www.designtokens.org/TR/2025.10/) design tokens into the files a web project uses. It also checks the brand, lints UI code against it, and captures rendered pages for review.
 
 - **`build`** writes `tokens.css`, `brand.css`, both DaisyUI 5 theme forms, `lint.json` and a GitHub README brand sheet (swatch SVGs and PNG specimens, day and night).
-- **`check`** checks the schema, the contrast of every declared colour pair (WCAG 2.x) and the brand rules, and fails on any token value left as `"TODO"`.
+- **`check`** checks the schema, the contrast (WCAG 2.x) of every declared colour pair and of every DaisyUI colour under its `-content` colour in each theme, and the brand rules, and fails on any token value left as `"TODO"`.
 - **`lint`** runs rules R1–R9 on CSS, HTML, HEEx, Elixir `~H` and Go `html/template` sources and on compiled CSS. It also runs as an edit-time agent hook.
 - **`capture`** takes screenshots at 375/768/1280/1920 with axe-core, computed contrast and overflow per width. It works from a URL or from a browser an e2e script is driving.
 - **`install` / `update`** vendor a brand's built files and its README brand sheet into a project, pinned in `brandkit.lock`. `install --check` verifies them offline.
@@ -63,7 +63,7 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
   - `icons` (`set`, `strokeWidth`, `prefix`, `usage`, `examples`);
   - `radius`, `spacing` and `type` (token lists, smallest first; type largest first);
   - `fonts` (role → fontFamily token);
-  - `contrast` (`fg`, `bg`, `min`, `use`);
+  - `contrast` (`fg`, `bg`, `min`, `use`). `fg` and `bg` are colour token paths, or `daisyui:<colour>` (such as `daisyui:info-content`) for the token each theme's `com.mapleset.daisyui` mapping gives that colour, so one pair can check a different token in each theme. Without declaring anything, `check` and the sheet's Contrast table also test, in every theme, each of `primary`, `secondary`, `accent`, `neutral`, `info`, `success`, `warning` and `error` under its `-content` colour, and `base-content` on `base-100`, at 4.5:1 (normal text). A declared pair with the same `fg` and `bg` (`daisyui:accent-content` on `daisyui:accent`) replaces that automatic pair and its minimum: raise it, or set 3 for a colour kept to large type, and the sheet then draws that colour's component examples in large type (below 3, it leaves them out). A failure names the theme, the pair (with the tokens a `daisyui:` colour stands for) and the ratio;
   - `roles` (token, use);
   - `do`, `dont`;
   - `opacityMin` (R8's threshold, default 70).

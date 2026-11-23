@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/shermanhuman/brandkit/internal/brand"
-	"github.com/shermanhuman/brandkit/internal/color"
 	"github.com/shermanhuman/brandkit/internal/dtcg"
 )
 
@@ -290,12 +289,12 @@ func (s *sheet) colour() error {
 		}
 		s.p("\n")
 	}
-	s.p("\n### Contrast\n\nEvery pair the brand declares, by the WCAG 2.x ratio (`brandkit check` fails below the minimum).\n\n| Text | On | Use | Minimum |")
+	s.p("\n### Contrast\n\nEvery pair the brand declares, then the pairs brandkit adds itself: each DaisyUI colour's `-content` text on it, and `base-content` on `base-100`. Ratios are WCAG 2.x; `brandkit check` fails below the minimum. A `daisyui:` colour is whichever token that theme's DaisyUI mapping gives it, named under the ratio.\n\n| Text | On | Use | Minimum |")
 	for _, th := range s.b.Themes {
 		s.p(" %s |", th.Config.Label)
 	}
 	s.p("\n|---|---|---|---|%s\n", strings.Repeat("---|", len(s.b.Themes)))
-	for _, pr := range s.rules.Contrast {
+	for _, pr := range ContrastPairs(s.b, s.rules) {
 		s.p("| `%s` | `%s` | %s | %s:1 |", pr.FG, pr.BG, pr.Use, brand.Num(pr.Min))
 		for _, th := range s.b.Themes {
 			ratio, err := PairRatio(th, pr)
@@ -306,7 +305,13 @@ func (s *sheet) colour() error {
 			if ratio+1e-9 < pr.Min {
 				verdict = "**fails**"
 			}
-			s.p(" %.2f:1 %s |", ratio, verdict)
+			s.p(" %.2f:1 %s", ratio, verdict)
+			if strings.HasPrefix(pr.FG, DaisyPrefix) || strings.HasPrefix(pr.BG, DaisyPrefix) {
+				fg, _ := PairColor(th, pr.FG)
+				bg, _ := PairColor(th, pr.BG)
+				s.p("<br><sub>`%s` on `%s`</sub>", fg.Name(), bg.Name())
+			}
+			s.p(" |")
 		}
 		s.p("\n")
 	}
@@ -322,7 +327,7 @@ func (s *sheet) colour() error {
 		}
 	}
 	if len(rest) > 0 {
-		s.p("\n<details>\n<summary>The full palette (%d colours)</summary>\n\n| Token | CSS |", len(rest))
+		s.p("\n<details>\n<summary>%s</summary>\n\n| Token | CSS |", otherColours(len(rest)))
 		for _, th := range s.b.Themes {
 			s.p(" %s |", th.Config.Label)
 		}
@@ -344,23 +349,13 @@ func (s *sheet) colour() error {
 	return nil
 }
 
-// PairRatio is a declared pair's WCAG ratio in a theme, the foreground
-// composited over the background.
-func PairRatio(th *brand.Theme, pr brand.ContrastPair) (float64, error) {
-	fg, bg := th.Tokens.Get(pr.FG), th.Tokens.Get(pr.BG)
-	if fg == nil || bg == nil || fg.Type != "color" || bg.Type != "color" {
-		return 0, fmt.Errorf("theme %s: contrast pair %s on %s needs two colour tokens", th.Name, pr.FG, pr.BG)
+// otherColours is the summary of the collapsed table of colour tokens
+// that the roles table doesn't show.
+func otherColours(n int) string {
+	if n == 1 {
+		return "Other colours: 1 token not in the roles table"
 	}
-	f, err := brand.ColorRGB(fg.Value)
-	if err != nil {
-		return 0, err
-	}
-	b, err := brand.ColorRGB(bg.Value)
-	if err != nil {
-		return 0, err
-	}
-	b.A = 1
-	return color.Contrast(f.Over(b), b), nil
+	return fmt.Sprintf("Other colours: %d tokens not in the roles table", n)
 }
 
 func (s *sheet) typeSection() error {
@@ -576,9 +571,37 @@ func (s *sheet) install() error {
 	s.p("| [`%s`](%s) | DaisyUI themes for Tailwind 4 with vendored `daisyui.js` (`@plugin` blocks; removes Tailwind's default palette) |\n", out(c.DaisyUI.PluginCSS), s.rel(out(c.DaisyUI.PluginCSS)))
 	s.p("| [`%s`](%s) | what `brandkit lint` checks against |\n\n", out(c.Lint), s.rel(out(c.Lint)))
 	names := make([]string, 0, len(s.b.Themes))
+	same := true
 	for _, th := range s.b.Themes {
 		names = append(names, "`"+th.Config.DaisyUI+"`")
+		if sel := th.Config.Selector; sel != daisySelector(th) && !(th.Config.Default && sel == ":root") {
+			same = false
+		}
 	}
-	s.p("Select a theme with `data-theme` on `<html>`: %s.\n", strings.Join(names, ", "))
+	if same {
+		s.p("Select a theme with `data-theme` on `<html>`: %s.\n", strings.Join(names, ", "))
+		return nil
+	}
+	// A theme's tokens.css selector isn't its DaisyUI one, so one
+	// attribute value doesn't switch every file (mapleset-brand#2 F2-m2).
+	s.p("Select a theme on `<html>`. The files don't all switch on the same selector, so use the one for the files the page loads:\n\n")
+	s.p("| Theme | [`%s`](%s), [`%s`](%s) | [`%s`](%s), [`%s`](%s) |\n|---|---|---|\n",
+		out(c.DaisyUI.ThemesCSS), s.rel(out(c.DaisyUI.ThemesCSS)), out(c.DaisyUI.PluginCSS), s.rel(out(c.DaisyUI.PluginCSS)),
+		out(c.TokensCSS.File), s.rel(out(c.TokensCSS.File)), out(c.BrandCSS.File), s.rel(out(c.BrandCSS.File)))
+	for _, th := range s.b.Themes {
+		daisy := fmt.Sprintf("`data-theme=\"%s\"`", th.Config.DaisyUI)
+		tok := "`" + strings.ReplaceAll(th.Config.Selector, "|", `\|`) + "`"
+		if th.Config.Default {
+			daisy += " or none (the default)"
+			if th.Config.Selector == ":root" {
+				tok += " (the default: no attribute needed)"
+			}
+		}
+		s.p("| %s | %s | %s |\n", th.Config.Label, daisy, tok)
+	}
 	return nil
+}
+
+func daisySelector(th *brand.Theme) string {
+	return fmt.Sprintf(`[data-theme="%s"]`, th.Config.DaisyUI)
 }
