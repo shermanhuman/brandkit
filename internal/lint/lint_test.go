@@ -186,3 +186,33 @@ func TestDefaultConfigSkipsBrandRules(t *testing.T) {
 		t.Fatalf("without a brand, R6, R7 and R9 have nothing to check: %v", fs)
 	}
 }
+
+// TestNoBrandFontRule: without a brand, R6 is off for arbitrary font
+// classes in source and in compiled selectors, as it is for font-family
+// declarations (A-M7). With the brand it still fires.
+func TestNoBrandFontRule(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		kind Kind
+	}{
+		{"page.html", `<h1 class="font-[Papyrus]">Hi</h1>`, KindOf("page.html")},
+		{"app.css", `.font-\[Papyrus\]{font-family:Papyrus}`, KindCompiled},
+	}
+	for _, c := range cases {
+		fs, _ := Source(DefaultConfig(), c.name, []byte(c.src), c.kind)
+		for _, f := range fs {
+			if f.Rule == "R6" {
+				t.Errorf("%s without a brand: %s", c.name, f)
+			}
+		}
+		fs, _ = Source(fixtureConfig(t), c.name, []byte(c.src), c.kind)
+		r6 := false
+		for _, f := range fs {
+			r6 = r6 || f.Rule == "R6"
+		}
+		if !r6 {
+			t.Errorf("%s with the brand: no R6 in %v", c.name, fs)
+		}
+	}
+}

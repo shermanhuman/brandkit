@@ -156,7 +156,8 @@ func TestHookFindsTheProjectFromTheFile(t *testing.T) {
 	}
 	// Without a lock the agent is told the brand rules were off.
 	loose := write(t, filepath.Join(t.TempDir(), "page.heex"), brandPage)
-	if msg := hookContext(t, filepath.Dir(loose), loose); !strings.Contains(msg, "No brandkit.lock") || strings.Contains(msg, "error R7") {
+	if msg := hookContext(t, filepath.Dir(loose), loose); !strings.Contains(msg, "No brandkit.lock") ||
+		strings.Contains(msg, "error R6") || strings.Contains(msg, "error R7") || strings.Contains(msg, "error R9") || !strings.Contains(msg, "R3") {
 		t.Errorf("no lock: %q", msg)
 	}
 	// Files in folders lint skips are skipped here too (R1-m2).
@@ -192,6 +193,11 @@ func TestLintFilesAndBrand(t *testing.T) {
 	}
 	if code, out, errs := runCLI(t, "", "lint", "--no-brand", pass); code != 0 || !strings.Contains(out, "1 files checked") || !strings.Contains(out, "no brand") {
 		t.Errorf("--no-brand: %d %s %s", code, out, errs)
+	}
+	// The brand rules are off: an arbitrary font class is no finding (A-M7).
+	font := write(t, filepath.Join(t.TempDir(), "font.html"), `<h1 class="font-[Papyrus]">Hi</h1>`+"\n")
+	if code, out, errs := runCLI(t, "", "lint", "--no-brand", font); code != 0 || strings.Contains(out, "error R6") {
+		t.Errorf("--no-brand font-[Papyrus]: %d %q %q", code, out, errs)
 	}
 	write(t, filepath.Join(empty, "main.go"), "package main\n")
 	if code, out, errs := runCLI(t, "", "lint", "--no-brand", "main.go"); code != 2 || !strings.Contains(out, "skipped main.go") || !strings.Contains(errs, "no files checked") {

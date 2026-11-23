@@ -438,7 +438,8 @@ func (l *linter) class(c string, off int) {
 		}
 		switch {
 		case kind == "font":
-			if !weightValRe.MatchString(val) {
+			// R6 needs the brand's fonts, like the font-family check.
+			if len(l.cfg.Fonts) > 0 && !weightValRe.MatchString(val) {
 				l.add(off, "R6", "error", c, "arbitrary font; use the brand's font utilities (font-sans, font-mono)")
 			}
 			return
