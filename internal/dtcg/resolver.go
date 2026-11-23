@@ -52,7 +52,7 @@ func ParseResolver(data []byte, dir string) (*Resolver, error) {
 	doc := v.(*Object)
 	r := &Resolver{Name: doc.String("name"), Description: doc.String("description"), Dir: dir, doc: doc, loaded: map[string]*Object{}}
 	ro, _ := doc.Values["resolutionOrder"].([]any)
-	for i, e := range ro {
+	for _, e := range ro {
 		o := e.(*Object)
 		var name, kind string
 		var entry *Object
@@ -81,7 +81,6 @@ func ParseResolver(data []byte, dir string) (*Resolver, error) {
 			}
 			r.modifiers = append(r.modifiers, m)
 		}
-		_ = i
 	}
 	// Load every source now, so a broken file or a set cycle fails early.
 	for _, e := range r.order {
@@ -167,6 +166,14 @@ func (r *Resolver) walkContext(e *Object, context string, stack []string, fn fun
 			doc, err := r.loadFile(ref)
 			if err != nil {
 				return err
+			}
+			// Keys beside $ref extend the referenced document: they are
+			// merged over it (Resolver module, reference objects).
+			if len(o.Keys) > 1 {
+				doc = Clone(doc).(*Object)
+				local := Clone(o).(*Object)
+				local.Delete("$ref")
+				MergeInto(doc, local)
 			}
 			if err := fn(doc); err != nil {
 				return err
