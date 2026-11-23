@@ -54,3 +54,41 @@ func TestRefSiblingsOverride(t *testing.T) {
 		t.Error("space.sm was lost: top-level properties not named beside $ref must remain")
 	}
 }
+
+// TestOrderRefSiblingsOverride: keys beside a $ref directly in
+// resolutionOrder override the referenced set's properties too (F4-m1).
+func TestOrderRefSiblingsOverride(t *testing.T) {
+	resolver := []byte(`{
+  "version": "2025.10",
+  "sets": {
+    "base": {
+      "sources": [
+        {"color": {"bg": {"$type": "color", "$value": {"colorSpace": "srgb", "components": [0, 0, 0], "hex": "#000000"}}}}
+      ]
+    }
+  },
+  "resolutionOrder": [
+    {
+      "$ref": "#/sets/base",
+      "sources": [
+        {"color": {"bg": {"$type": "color", "$value": {"colorSpace": "srgb", "components": [1, 1, 1], "hex": "#ffffff"}}}}
+      ]
+    }
+  ]
+}`)
+	r, err := ParseResolver(resolver, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	toks, err := r.Resolve(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bg := toks.Get("color.bg")
+	if bg == nil {
+		t.Fatal("no color.bg")
+	}
+	if hex := bg.Value.(*Object).String("hex"); hex != "#ffffff" {
+		t.Errorf("color.bg = %s, want #ffffff from the sources beside $ref", hex)
+	}
+}

@@ -61,6 +61,7 @@ func ParseResolver(data []byte, dir string) (*Resolver, error) {
 			if err != nil {
 				return nil, err
 			}
+			entry = overrideRef(entry, o)
 		} else {
 			kind, name, entry = o.String("type"), o.String("name"), o
 		}
