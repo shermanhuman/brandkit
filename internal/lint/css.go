@@ -16,7 +16,42 @@ var (
 	urlRe       = regexp.MustCompile(`(?i)url\([^)]*\)`)
 	sizeLitRe   = regexp.MustCompile(`(?i)(?:^|[\s,(])-?\d*\.?\d+(?:px|rem|em|pt)\b`)
 	zeroRe      = regexp.MustCompile(`^(?:0|0px|0rem)$`)
+	wordRe      = regexp.MustCompile(`-*[a-zA-Z][\w-]*`)
 )
+
+// namedColours are CSS's named colours, less transparent and currentColor.
+var namedColours = map[string]bool{}
+
+func init() {
+	for _, n := range strings.Fields(`aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue
+blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue
+darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid
+darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink
+deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold
+goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush
+lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey
+lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime
+limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen
+mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin
+navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise
+palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue
+saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow
+springgreen steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen`) {
+		namedColours[n] = true
+	}
+}
+
+// namedColour reports a named colour keyword (red, white) in a value.
+// Quoted strings and var(--names) don't count.
+func namedColour(val string) bool {
+	val = quotedRe.ReplaceAllString(val, `""`)
+	for _, w := range wordRe.FindAllString(val, -1) {
+		if namedColours[strings.ToLower(w)] {
+			return true
+		}
+	}
+	return false
+}
 
 // inlineSize are the properties R4 reads for raw sizes in a style attribute.
 var inlineSize = []string{"font-size", "line-height", "letter-spacing", "margin", "padding", "gap", "row-gap", "column-gap", "border-radius"}
@@ -30,12 +65,50 @@ func hasPrefixAny(s string, ps []string) bool {
 	return false
 }
 
-// css lints a stylesheet, a <style> block or (inline) a style attribute.
-func (l *linter) css(data []byte, base int, inline bool, _ string) {
+// where says what a declaration came from, which picks the rule it breaks.
+type where int
+
+const (
+	inCSS   where = iota // a stylesheet or a <style> block (R5)
+	inStyle              // a style attribute (R4)
+	inClass              // an arbitrary property class, [color:#f00] (R1, R2)
+)
+
+// css lints a stylesheet, a <style> block or a style attribute.
+func (l *linter) css(data []byte, base int, w where) {
 	lower := bytes.ToLower(data)
-	p := css.NewParser(parse.NewInputBytes(data), inline)
+	p := css.NewParser(parse.NewInputBytes(data), w == inStyle)
 	prev := 0
 	var stack []string
+	// Tailwind 4's @theme, @utility and @plugin blocks reach us as raw
+	// tokens; buf collects one declaration's worth of them.
+	var buf strings.Builder
+	bufStart := -1
+	flush := func() {
+		text := strings.TrimSpace(buf.String())
+		start := bufStart
+		buf.Reset()
+		bufStart = -1
+		if text == "" {
+			return
+		}
+		if rest, ok := strings.CutPrefix(text, "@apply"); ok {
+			for _, m := range splitRe.FindAllStringIndex(rest, -1) {
+				l.class(rest[m[0]:m[1]], base+start+len("@apply")+m[0])
+			}
+			return
+		}
+		prop, val, ok := strings.Cut(text, ":")
+		prop = strings.TrimSpace(prop)
+		if !ok || !propRe.MatchString(prop) {
+			return
+		}
+		val = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(val), "!important"))
+		if len(stack) > 0 && strings.HasPrefix(stack[len(stack)-1], "@theme") {
+			prop = themeProp(prop)
+		}
+		l.decl(prop, val, base+start, w, l.focus(stack), "")
+	}
 	for {
 		gt, _, d := p.Next()
 		end := p.Offset()
@@ -52,8 +125,28 @@ func (l *linter) css(data []byte, base int, inline bool, _ string) {
 		case css.BeginAtRuleGrammar:
 			stack = append(stack, string(d)+" "+tokens(p.Values()))
 		case css.EndRulesetGrammar, css.EndAtRuleGrammar:
+			flush()
 			if len(stack) > 0 {
 				stack = stack[:len(stack)-1]
+			}
+		case css.TokenGrammar:
+			if len(stack) == 0 || !strings.HasPrefix(stack[len(stack)-1], "@") {
+				break
+			}
+			switch t := string(d); t {
+			case ";", "}":
+				flush()
+			case "{":
+				buf.Reset() // a nested selector, &:hover {
+				bufStart = -1
+			default:
+				if bufStart < 0 {
+					if strings.TrimSpace(t) == "" {
+						break
+					}
+					bufStart = prev
+				}
+				buf.WriteString(t)
 			}
 		case css.AtRuleGrammar:
 			if string(d) == "@apply" {
@@ -67,16 +160,37 @@ func (l *linter) css(data []byte, base int, inline bool, _ string) {
 			prop := string(d)
 			val := tokens(p.Values())
 			off := locate(lower, []byte(strings.ToLower(prop)), prev, end)
-			focus := false
-			for _, s := range stack {
-				if strings.Contains(s, ":focus") {
-					focus = true
-				}
-			}
-			l.decl(prop, val, base+off, inline, focus)
+			l.decl(prop, val, base+off, w, l.focus(stack), "")
 		}
 		prev = end
 	}
+}
+
+var propRe = regexp.MustCompile(`^-{0,2}[a-zA-Z][\w-]*(?:-\*)?$`)
+
+// focus reports whether a rule sits under a :focus selector.
+func (l *linter) focus(stack []string) bool {
+	for _, s := range stack {
+		if strings.Contains(s, ":focus") {
+			return true
+		}
+	}
+	return false
+}
+
+// themeProp maps a Tailwind @theme variable to the property it feeds, so
+// --font-display is read as a font-family and --shadow-glow as a shadow.
+func themeProp(prop string) string {
+	switch {
+	case strings.HasPrefix(prop, "--font-") && !strings.HasPrefix(prop, "--font-weight-") &&
+		!strings.HasPrefix(prop, "--font-feature-settings") && !strings.HasPrefix(prop, "--font-variation-settings") &&
+		!strings.HasSuffix(prop, "-*"):
+		return "font-family"
+	case strings.HasPrefix(prop, "--shadow-"), strings.HasPrefix(prop, "--inset-shadow-"),
+		strings.HasPrefix(prop, "--drop-shadow-"), strings.HasPrefix(prop, "--text-shadow-"):
+		return "box-shadow"
+	}
+	return prop
 }
 
 func tokens(ts []css.Token) string {
@@ -104,16 +218,44 @@ func locate(lower, needle []byte, from, to int) int {
 	return from
 }
 
-func (l *linter) decl(prop, val string, off int, inline, focus bool) {
-	prop = strings.ToLower(prop)
-	text := prop + ": " + val
-	clean := urlRe.ReplaceAllString(val, "url()")
-	rule, where := "R5", "raw colour in project CSS; use a token custom property or a theme role"
-	if inline {
-		rule, where = "R4", "raw colour in a style attribute; use a class or var(--token)"
+// colourProps are the properties whose named-colour keywords (red,
+// white) count as raw colours.
+func colourProp(prop string) bool {
+	switch prop {
+	case "color", "fill", "stroke", "caret-color", "accent-color", "scrollbar-color", "stop-color", "flood-color",
+		"lighting-color", "box-shadow", "text-shadow", "filter", "-webkit-text-stroke", "-webkit-text-stroke-color",
+		"-webkit-text-fill-color", "-webkit-tap-highlight-color":
+		return true
 	}
-	if colourLitRe.MatchString(clean) {
-		l.add(off, rule, "error", text, "%s", where)
+	for _, p := range []string{"background", "border", "outline", "text-decoration", "column-rule", "text-emphasis"} {
+		if prop == p || strings.HasPrefix(prop, p+"-") {
+			return true
+		}
+	}
+	return strings.HasPrefix(prop, "--") && strings.Contains(prop, "color")
+}
+
+// rawColour reports a colour literal (hex or a colour function) in a value.
+func rawColour(val string) bool {
+	return colourLitRe.MatchString(urlRe.ReplaceAllString(val, "url()"))
+}
+
+func (l *linter) decl(prop, val string, off int, w where, focus bool, text string) {
+	prop = strings.ToLower(prop)
+	if text == "" {
+		text = prop + ": " + val
+	}
+	clean := urlRe.ReplaceAllString(val, "url()")
+	colourRule, colourMsg := "R5", "raw colour in project CSS; use a token custom property or a theme role"
+	sizeRule := "R5"
+	switch w {
+	case inStyle:
+		colourRule, colourMsg, sizeRule = "R4", "raw colour in a style attribute; use a class or var(--token)", "R4"
+	case inClass:
+		colourRule, colourMsg, sizeRule = "R1", "arbitrary colour value; use a theme role (bg-primary, text-base-content) or a token", "R2"
+	}
+	if colourLitRe.MatchString(clean) || colourProp(prop) && namedColour(clean) {
+		l.add(off, colourRule, "error", text, "%s", colourMsg)
 		return
 	}
 	switch {
@@ -128,15 +270,22 @@ func (l *linter) decl(prop, val string, off int, inline, focus bool) {
 			l.add(off, "R7", "error", text, "the brand bans shadows and glows")
 		}
 	case prop == "font-size" && !strings.Contains(val, "var(--") && sizeLitRe.MatchString(" "+val):
-		if inline {
-			l.add(off, "R4", "error", text, "raw font size in a style attribute; use a type token or class")
-		} else {
-			l.add(off, "R5", "error", text, "raw font size in project CSS; use a type token")
+		switch w {
+		case inStyle:
+			l.add(off, sizeRule, "error", text, "raw font size in a style attribute; use a type token or class")
+		case inClass:
+			l.add(off, sizeRule, "error", text, "arbitrary size, spacing or type value; use the scale or a token")
+		default:
+			l.add(off, sizeRule, "error", text, "raw font size in project CSS; use a type token")
 		}
-	case inline && hasPrefixAny(prop, inlineSize) && !strings.Contains(val, "var(--"):
+	case w != inCSS && hasPrefixAny(prop, inlineSize) && !strings.Contains(val, "var(--"):
 		for _, f := range strings.Fields(val) {
 			if !zeroRe.MatchString(f) && sizeLitRe.MatchString(" "+f) {
-				l.add(off, "R4", "error", text, "raw size in a style attribute; use the spacing scale or a token")
+				msg := "raw size in a style attribute; use the spacing scale or a token"
+				if w == inClass {
+					msg = "arbitrary size, spacing or type value; use the scale or a token"
+				}
+				l.add(off, sizeRule, "error", text, "%s", msg)
 				return
 			}
 		}

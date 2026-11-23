@@ -4,7 +4,6 @@ package brand
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -93,9 +92,6 @@ type DaisyUIConfig struct {
 type ReadmeConfig struct {
 	File   string `json:"file,omitempty"`   // default README.md
 	Assets string `json:"assets,omitempty"` // default <out>/sheet
-	// Components is an HTML fragment (relative to the package) rendered in
-	// both themes for the component examples; default: brandkit's own.
-	Components string `json:"components,omitempty"`
 }
 
 // FontConfig is one font family the brand ships.
@@ -141,6 +137,9 @@ func Load(dir string) (*Brand, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := findTodos(r); err != nil {
+		return nil, err
+	}
 	b := &Brand{Dir: dir, Config: c, Resolver: r}
 	var mod *dtcg.Modifier
 	for _, m := range r.Modifiers() {
@@ -180,6 +179,68 @@ func Load(dir string) (*Brand, error) {
 		return nil, fmt.Errorf("%s: exactly one theme must be the default (found %d)", ConfigFile, defaults)
 	}
 	return b, nil
+}
+
+// TodoError lists token values left as the placeholder "TODO".
+type TodoError struct{ Tokens []string }
+
+func (e *TodoError) Error() string {
+	return fmt.Sprintf("%d token values are the placeholder \"TODO\": %s", len(e.Tokens), strings.Join(e.Tokens, ", "))
+}
+
+// findTodos fails a package whose token files hold a $value (or part of a
+// composite $value) that is the string "TODO", naming each token.
+func findTodos(r *dtcg.Resolver) error {
+	var found []string
+	for _, f := range r.Files() {
+		data, err := os.ReadFile(filepath.Join(r.Dir, filepath.FromSlash(f)))
+		if err != nil {
+			return err
+		}
+		doc, err := dtcg.Decode(data)
+		if err != nil {
+			return err
+		}
+		var walk func(v any, path []string)
+		walk = func(v any, path []string) {
+			o, ok := v.(*dtcg.Object)
+			if !ok {
+				return
+			}
+			if val, ok := o.Get("$value"); ok {
+				if hasTodo(val) {
+					found = append(found, f+": "+strings.Join(path, "."))
+				}
+				return
+			}
+			for _, k := range o.Keys {
+				if !strings.HasPrefix(k, "$") {
+					walk(o.Values[k], append(slices.Clone(path), k))
+				}
+			}
+		}
+		walk(doc, nil)
+	}
+	if len(found) > 0 {
+		return &TodoError{Tokens: found}
+	}
+	return nil
+}
+
+func hasTodo(v any) bool {
+	switch x := v.(type) {
+	case string:
+		return x == "TODO"
+	case []any:
+		return slices.ContainsFunc(x, hasTodo)
+	case *dtcg.Object:
+		for _, k := range x.Keys {
+			if hasTodo(x.Values[k]) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (c *Config) defaults() {
@@ -339,6 +400,3 @@ type Role struct {
 	Token string `json:"token"`
 	Use   string `json:"use"`
 }
-
-// ErrNoRules is returned when a rule the caller needs is missing.
-var ErrNoRules = errors.New("the brand declares no rules")

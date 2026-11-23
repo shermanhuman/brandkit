@@ -3,10 +3,10 @@
 brandkit turns a brand defined as [DTCG 2025.10](https://www.designtokens.org/TR/2025.10/) design tokens into the files a web project uses. It also checks the brand, lints UI code against it, and captures rendered pages for review.
 
 - **`build`** writes `tokens.css`, `brand.css`, both DaisyUI 5 theme forms, `lint.json` and a GitHub README brand sheet (swatch SVGs and PNG specimens, day and night).
-- **`check`** checks the schema, the contrast of every declared colour pair (WCAG 2.x) and the brand rules.
+- **`check`** checks the schema, the contrast of every declared colour pair (WCAG 2.x) and the brand rules, and fails on any token value left as `"TODO"`.
 - **`lint`** runs rules R1–R9 on CSS, HTML, HEEx, Elixir `~H` and Go `html/template` sources and on compiled CSS. It also runs as an edit-time agent hook.
 - **`capture`** takes screenshots at 375/768/1280/1920 with axe-core, computed contrast and overflow per width. It works from a URL or from a browser an e2e script is driving.
-- **`install` / `update`** vendor a brand's built files into a project, pinned in `brandkit.lock`.
+- **`install` / `update`** vendor a brand's built files and its README brand sheet into a project, pinned in `brandkit.lock`. `install --check` verifies them offline.
 
 It is one Go binary with no Node. Browser work uses Chrome for Testing's headless shell, pinned through mise.
 
@@ -40,7 +40,7 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
 | `name`, `description`, `repo` | | shown in the README; `repo` (owner/name) goes in its install section |
 | `resolver` | required | the resolver document |
 | `modifier` | `theme` | the resolver modifier whose contexts are the themes |
-| `themes.<context>` | required | `daisyui` (theme name), `colorScheme` (dark/light), `default` (exactly one), `prefersDark`, `selector` (for tokens.css; default `[data-theme="<daisyui>"]`), `label`, `github` (dark/light: which GitHub scheme shows it in the README) |
+| `themes.<context>` | required | `daisyui` (theme name), `colorScheme` (dark/light), `default` (exactly one), `prefersDark`, `selector` (for tokens.css; default `[data-theme="<daisyui>"]`. Other themes' blocks hold only what differs, so unless the default theme's selector is `:root`, its block also lists every other theme's selector), `label`, `github` (dark/light: which GitHub scheme shows it in the README) |
 | `out` | `export` | folder for generated files |
 | `tokensCss.file` / `.include` / `.template` / `.header` | `ui/tokens.css`, `["type:color"]` | `include` takes path prefixes or `type:<name>`. `template` is a Go `text/template` that writes the whole file, so a legacy file can be reproduced byte for byte (fields: `.Brand`, `.GeneratedBy`, `.Default`, `.Themes`, each with `.Name .Selector .ColorScheme .Default .Decls .Changed`, and `.Value "<name>"`) |
 | `brandCss.file` | `ui/brand.css` | every token not in tokens.css (type, spacing, radius, motion) |
@@ -51,7 +51,7 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
 | `lint` | `lint.json` | |
 | `readme.file` / `.assets` | `README.md`, `<out>/sheet` | |
 | `fonts[]` | | `family`, `css` (the `@font-face` file), `license` |
-| `install` | | extra files or folders `brandkit install` vendors (tokens, fonts, assets) |
+| `install` | | extra files or folders `brandkit install` vendors (tokens, fonts, assets). The generated files, `brandkit.json`, the README and its sheet folder always go. Every path must stay inside the package |
 
 **Token extensions** (in a token file's root `$extensions`, merged across files like tokens):
 
@@ -75,15 +75,27 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
 brandkit build [dir] [--no-images]     # in a brand package
 brandkit check [dir] [--json]
 brandkit install owner/repo@v1.2.0     # in a project: vendor/brand/<repo>/… and brandkit.lock
-brandkit install                       # reinstall what the lock pins; fails if a tag moved or a file differs
+brandkit install --check               # offline: fails if a vendored file is missing or was edited
+brandkit install                       # reinstall what the lock pins; fails if a tag moved or the
+                                       # downloaded files differ from the lock; restores local edits
 brandkit update [owner/repo[@tag]]     # default: the newest release
-brandkit lint [paths…] [--compiled priv/static/assets/css/app.css] [--config lint.json] [--json]
+brandkit lint [paths…] [--compiled priv/static/assets/css/app.css] [--config lint.json] [--json] [-v] [--no-brand]
 brandkit capture --url http://localhost:4000/ --out shots
 brandkit capture --cdp ws://127.0.0.1:9222/devtools/browser/… --match /campaigns --out shots
 brandkit version
 ```
 
-Exit status is 0 when clean, 1 when there are findings, and 2 on a usage or runtime error. `capture --no-fail` always exits 0.
+Exit status:
+
+- 0: clean.
+- 1: findings. That is `check` errors (a package that doesn't load counts, reported as a `schema` or `todo` error), `lint` errors (warnings alone exit 0), `capture` failures, or `install --check` finding a missing or edited file.
+- 2: a usage or runtime error. This includes `lint` when it checked no files or found no brand (without `--no-brand`), `capture` of a page that answers 4xx or 5xx, and `install --check` with no brands in the lock.
+
+`capture --no-fail` exits 0 when there are findings, but still exits 2 on an error. `lint --hook` always exits 0.
+
+Run `brandkit install --check` in a project's CI to catch hand edits to vendored brand files.
+
+`install` stages the new files beside the destination and checks them before it swaps them in, so a failed or refused install leaves the vendored files and `brandkit.lock` as they were. It refuses a destination that another repository in the lock already holds (two owners' `brand` repositories, say); give the second one its own `--dir`. It also refuses to install through a symlinked folder.
 
 Private brand repositories need a token: `$GH_TOKEN`, `$GITHUB_TOKEN`, or `gh auth token`. `$BRANDKIT_GITHUB_API` points install at another API host.
 
@@ -91,26 +103,33 @@ Private brand repositories need a token: `$GH_TOKEN`, `$GITHUB_TOKEN`, or `gh au
 
 | Rule | Finds |
 |---|---|
-| R1 | arbitrary colour classes: `bg-[#fff]`, `text-[rgb(…)]` |
+| R1 | arbitrary colour classes: `bg-[#fff]`, `bg-[red]`, `text-[rgb(…)]`, a colour anywhere in an arbitrary value, and arbitrary properties such as `[color:#f00]` |
 | R2 | arbitrary sizes: `text-[13px]`, `mt-[7px]`, `rounded-[3px]` (`var(--…)` is allowed, and so are grid templates, aspect ratios and pills) |
 | R3 | Tailwind's default palette: `bg-blue-500`, `text-gray-700`. `bg-white`/`text-black` are warnings |
-| R4 | `style` attributes with raw colours or sizes |
-| R5 | raw colours or font sizes in project CSS (including `var(--x, #fff)` fallbacks) |
-| R6 | fonts outside the brand: `font-family`, `font-[…]` |
-| R7 | shadows and glows when the brand bans them (focus rings are allowed) |
+| R4 | `style` attributes with raw colours (named colours such as `red` included) or sizes |
+| R5 | raw colours or font sizes in project CSS (including `var(--x, #fff)` fallbacks, named colours, and declarations in Tailwind's `@theme`, `@utility` and `@plugin` blocks) |
+| R6 | fonts outside the brand: `font-family`, `font-[…]` (a weight such as `font-[600]` is fine), `--font-*` in `@theme` |
+| R7 | shadows and glows when the brand bans them, arbitrary ones (`shadow-[…]`) included; focus rings and `var(--…)` shadows are allowed |
 | R8 | low-opacity text roles such as `text-base-content/40` (a warning: check them with capture) |
-| R9 | Heroicons names or inline SVG drawings in templates when the brand's set is something else |
+| R9 | Heroicons names in class lists and icon components' `name`, or inline SVG drawings in templates, when the brand's set is something else (DaisyUI's `hero-content` and `hero-overlay` are fine) |
 
-To silence a finding, put `brand-lint-ignore R5: reason` in a comment on the same line or the line before. The reason is required, and ignored findings are counted. Lint skips `vendor/`, `node_modules/`, `deps/`, `_build/`, `testdata/`, `priv/static/` and the generated token files. Without `--config` it uses the `lint.json` of the brand in `brandkit.lock`. With no brand installed, R6, R7 and R9 are off.
+To silence a finding, put `brand-lint-ignore R5: reason` anywhere on the same line or the line before; a comment is the usual place. The reason is required, and ignored findings are counted.
+
+Lint skips the folders `vendor/`, `node_modules/`, `deps/`, `_build/`, `dist/`, `testdata/` and `priv/static/`, and every folder whose name starts with a dot (`.git/`, `.elixir_ls/`). It also skips a file that is an unedited copy of one `brandkit.lock` pins, such as a `tokens.css` copied into `assets/`; an edited copy is linted. It prints how many files it checked and lists files given on the command line that it can't read; `-v` lists every file checked and skipped.
+
+Without `--config` it uses the `lint.json` of the brand in the nearest `brandkit.lock`, in the current folder or above. With no brand it exits 2, unless `--no-brand` is passed; then R6, R7 and R9 are off. It also exits 2 when it checked no files.
 
 ### Capture
 
 `report.json` is the same on every run for the same page and browser. It holds:
 
 - per width: the screenshot name and sha256, page height, overflow (scroll width and the outermost offending elements), axe-core 4.14.1 violations (WCAG 2.0–2.2 A/AA), and computed contrast (text over images is counted as skipped);
-- a summary that counts serious/critical axe findings, contrast failures and overflowing widths.
+- a summary that counts serious/critical axe findings, contrast failures and overflowing widths;
+- the HTTP status of the page, and the final URL when it redirected (to a sign-in page, say).
 
-Animations are frozen unless `--no-freeze` is given.
+A page that answers 4xx or 5xx is an error (exit 2), not a report. Text in disabled or inert controls (`disabled`, `aria-disabled="true"`, inside `inert` or a disabled fieldset) is counted as inactive and not checked for contrast, as WCAG 1.4.3 exempts it.
+
+Animations are frozen unless `--no-freeze` is given: finite ones at their end state, endless ones at their first frame.
 
 With `--cdp`, brandkit attaches to a running browser, such as one a Playwright e2e script launched with `--remote-debugging-port`. It finds the page whose URL contains `--match` and opens its own tab in that page's browser context, so it shares the signed-in cookies and storage. It captures `--url` (default: that page's URL) and then closes its tab. The script's page, viewport and state are left alone. The [spike notes](docs/spike.md) cover the trade-offs.
 
@@ -120,7 +139,9 @@ With `--cdp`, brandkit attaches to a running browser, such as one a Playwright e
 
 - **`brand`** ([SKILL.md](agent-plugin/skills/brand/SKILL.md)) defines or updates a brand package. It inventories the existing logos, token files, CSS and drafts, drafts the DTCG package with every conflict listed, settles the gaps with the user in one decision packet, runs `build` and `check`, and asks the user to approve the generated README sheet. It never invents a palette.
 - **`design`** ([SKILL.md](agent-plugin/skills/design/SKILL.md)) designs a screen inside the installed package; it installs the brand's package if one exists and refuses to start when none does. It writes user stories, builds three full mockups in the project's stack (a conventional one and two that each change one named axis), and runs `capture` and `lint` on each until they're clean. The user then picks one; in a run with no user, the agent's marked pick is used. It builds the pick and has a fresh reviewer check the screenshots.
-- **The hook:** after an Edit or Write to a file lint reads, it runs `brandkit lint --hook` and passes the findings back to the agent as context. It only warns; CI is where lint fails. If brandkit isn't installed, the hook exits 0 and does nothing.
+- **The hook:** after an Edit or Write to a file lint reads, it runs `brandkit lint --hook` and passes the findings back to the agent as context. The brand comes from the nearest `brandkit.lock` above the edited file. It only warns and always exits 0; CI is where lint fails. If lint can't run (the lock doesn't parse, or the brand's `lint.json` is missing until `brandkit install`), the hook tells the agent why.
+
+The hook uses `brandkit` from PATH, or asks mise for it (`mise which`, from the project's folder, so the project's pinned version is used). It never installs anything. If neither has brandkit and the project has a `brandkit.lock`, the hook tells the agent that brandkit isn't installed; otherwise it does nothing.
 
 ## Development
 

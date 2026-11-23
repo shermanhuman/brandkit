@@ -9,10 +9,23 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BRANDKIT_NO_SANDBOX: "1"
+      # Missing Chrome or Tailwind fails the browser tests instead of skipping them.
+      BRANDKIT_REQUIRE_TOOLS: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Versions agree
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          want=${VERSION#v}
+          plugin=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' agent-plugin/.claude-plugin/plugin.json)
+          cli=$(sed -n 's/^var version = "\([^"]*\)"/\1/p' cmd/brandkit/main.go)
+          if [ "$plugin" != "$want" ] || [ "$cli" != "$want" ]; then
+            echo "tag $VERSION, but plugin.json says $plugin and main.go says $cli" >&2
+            exit 1
+          fi
       - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
       - name: Test
         run: go test ./...

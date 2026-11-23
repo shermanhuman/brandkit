@@ -9,6 +9,7 @@ import (
 	"flag"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,6 +74,9 @@ func needChrome(t *testing.T) string {
 	t.Helper()
 	p, err := browser.Find("")
 	if err != nil {
+		if os.Getenv("BRANDKIT_REQUIRE_TOOLS") == "1" {
+			t.Fatal(err)
+		}
 		t.Skip(err)
 	}
 	return p
@@ -259,5 +263,138 @@ func TestCDPAttach(t *testing.T) {
 	var back Report
 	if err := json.Unmarshal(raw, &back); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestStatusAndRedirect: a page that answers 4xx/5xx is an error, not a
+// clean report; a redirect is recorded (R1-M9).
+func TestStatusAndRedirect(t *testing.T) {
+	needChrome(t)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ok", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<!doctype html><html lang="en"><title>ok</title><main><p>Fine.</p></main></html>`))
+	})
+	mux.HandleFunc("/old", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/ok", http.StatusFound) })
+	mux.HandleFunc("/", http.NotFound)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	for _, p := range []string{"/nope-typo", "/also/missing"} {
+		if _, err := Run(context.Background(), Options{URL: srv.URL + p, Out: t.TempDir(), Widths: []int{375}}); err == nil || !strings.Contains(err.Error(), "404") {
+			t.Errorf("%s: %v", p, err)
+		}
+	}
+	rep, err := Run(context.Background(), Options{URL: srv.URL + "/old", Out: t.TempDir(), Widths: []int{375}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Status != 200 || rep.FinalURL != srv.URL+"/ok" {
+		t.Errorf("status %d, final URL %q", rep.Status, rep.FinalURL)
+	}
+}
+
+// TestContrastSkipsInactiveControls: disabled and inert controls are
+// exempt from WCAG 1.4.3; an opaque oklch() background ends the background
+// walk; a fade-in is checked at its end state (change 2, R1-m8).
+func TestContrastSkipsInactiveControls(t *testing.T) {
+	needChrome(t)
+	page := `<!doctype html><html lang="en"><head><title>c</title><style>
+body { background: #f8fafd; color: #aeb9c4; font: 16px sans-serif; }
+button, input { background: #f8fafd; color: #aeb9c4; border: 0; font: inherit; }
+@keyframes in { from { opacity: 0; } to { opacity: 1; } }
+.fade { opacity: 0; animation: in 0.2s 0.1s forwards; }
+</style></head><body><main>
+<button>Enabled control</button>
+<button disabled>Disabled control</button>
+<span role="button" aria-disabled="true">Aria disabled</span>
+<div inert><p>Inert text</p></div>
+<fieldset disabled><legend>Legend text</legend><p>Fieldset text</p></fieldset>
+<div style="background-image: linear-gradient(#000, #000)"><p style="background: oklch(0.98 0.005 250)">Opaque oklch</p></div>
+<p class="fade">Faded in</p>
+</main></body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(page)) }))
+	defer srv.Close()
+	rep, err := Run(context.Background(), Options{URL: srv.URL + "/", Out: t.TempDir(), Widths: []int{375}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := rep.Widths[0].Contrast
+	failed := map[string]bool{}
+	for _, f := range c.Failures {
+		failed[f.Text] = true
+	}
+	for _, text := range []string{"Enabled control", "Legend text", "Opaque oklch", "Faded in"} {
+		if !failed[text] {
+			t.Errorf("%q should fail contrast: %+v", text, c)
+		}
+	}
+	for _, text := range []string{"Disabled control", "Aria disabled", "Inert text", "Fieldset text"} {
+		if failed[text] {
+			t.Errorf("%q is an inactive control's text, exempt from 1.4.3", text)
+		}
+	}
+	if c.Inactive != 4 {
+		t.Errorf("inactive %d, want 4", c.Inactive)
+	}
+}
+
+// TestContrastSkipsHiddenText: text inside an ancestor with opacity 0,
+// visibility hidden, display none or content-visibility hidden isn't
+// painted, so it needs no contrast ratio, even when its own box and
+// opacity look visible and the background walk stops before the hidden
+// ancestor (A-M6).
+func TestContrastSkipsHiddenText(t *testing.T) {
+	needChrome(t)
+	page := `<!doctype html><html lang="en"><head><title>h</title><style>
+body { background: #fff; font: 16px sans-serif; }
+span, p { color: #eee; background: #fff; }
+</style></head><body><main>
+<p>Visible faint</p>
+<div style="opacity:0"><div><span>Under opacity zero</span></div></div>
+<div style="visibility:hidden"><span>Under visibility hidden</span></div>
+<div style="content-visibility:hidden"><span>Under content-visibility</span></div>
+<div style="display:none"><span>Under display none</span></div>
+<div style="visibility:hidden"><span style="visibility:visible">Visible again</span></div>
+</main></body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(page)) }))
+	defer srv.Close()
+	rep, err := Run(context.Background(), Options{URL: srv.URL + "/", Out: t.TempDir(), Widths: []int{375}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	failed := map[string]bool{}
+	for _, f := range rep.Widths[0].Contrast.Failures {
+		failed[f.Text] = true
+	}
+	for _, text := range []string{"Visible faint", "Visible again"} {
+		if !failed[text] {
+			t.Errorf("%q should fail contrast: %+v", text, rep.Widths[0].Contrast)
+		}
+	}
+	for _, text := range []string{"Under opacity zero", "Under visibility hidden", "Under content-visibility", "Under display none"} {
+		if failed[text] {
+			t.Errorf("%q is hidden by an ancestor and needs no contrast", text)
+		}
+	}
+}
+
+// TestBareHostIsNoRedirect: --url http://host (no path) lands on
+// http://host/, which isn't a redirect; neither is a fragment (F2-m2).
+func TestBareHostIsNoRedirect(t *testing.T) {
+	needChrome(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<!doctype html><html lang="en"><title>ok</title><main><p id="top">Fine.</p></main></html>`))
+	}))
+	defer srv.Close()
+	for _, u := range []string{srv.URL, srv.URL + "/#top"} {
+		rep, err := Run(context.Background(), Options{URL: u, Out: t.TempDir(), Widths: []int{375}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rep.FinalURL != "" {
+			t.Errorf("%s: reported a redirect to %s", u, rep.FinalURL)
+		}
+	}
+	if sameURL("http://h/a", "http://h/b") || !sameURL("http://h", "http://h/") {
+		t.Error("sameURL")
 	}
 }

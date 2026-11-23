@@ -14,6 +14,8 @@ jobs:
     env:
       # Ubuntu's AppArmor blocks Chrome's user-namespace sandbox on runners.
       BRANDKIT_NO_SANDBOX: "1"
+      # Missing Chrome or Tailwind fails the browser tests instead of skipping them.
+      BRANDKIT_REQUIRE_TOOLS: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

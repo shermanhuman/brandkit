@@ -87,6 +87,9 @@ func TestGoldenImages(t *testing.T) {
 		t.Skip("PNG goldens are made on Linux")
 	}
 	if _, err := browser.Find(""); err != nil {
+		if os.Getenv("BRANDKIT_REQUIRE_TOOLS") == "1" {
+			t.Fatal(err)
+		}
 		t.Skip(err)
 	}
 	for _, name := range fixtures {
@@ -145,5 +148,48 @@ func TestTemplateTokensCSS(t *testing.T) {
 	s := string(out)
 	if !strings.HasPrefix(s, "/* Fixture Sub colours, in the legacy layout") || !strings.Contains(s, "\n[data-theme=\"light\"] {\n") {
 		t.Errorf("template output:\n%s", s)
+	}
+}
+
+// TestWriteRemovesStaleSheetFiles: a swatch for a colour the brand no
+// longer has is removed; files brandkit didn't name are kept (R1-m9).
+func TestWriteRemovesStaleSheetFiles(t *testing.T) {
+	src := fixtureDir("base")
+	dir := t.TempDir()
+	err := filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(src, p)
+		if d.IsDir() {
+			return os.MkdirAll(filepath.Join(dir, rel), 0o755)
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(dir, rel), data, 0o644)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sheet := filepath.Join(dir, "export", "sheet")
+	os.WriteFile(filepath.Join(sheet, "sw-123456.svg"), []byte("<svg/>"), 0o644)
+	os.WriteFile(filepath.Join(sheet, "notes.txt"), []byte("mine"), 0o644)
+	b, err := brand.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	written, err := Write(b, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(sheet, "sw-123456.svg")); !os.IsNotExist(err) {
+		t.Errorf("stale swatch kept: %v (wrote %v)", err, written)
+	}
+	for _, keep := range []string{"notes.txt", "sw-00696f.svg", "type-day.png"} {
+		if _, err := os.Stat(filepath.Join(sheet, keep)); err != nil {
+			t.Error(err)
+		}
 	}
 }

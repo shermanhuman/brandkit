@@ -36,13 +36,17 @@ Brand packages (run in the package, or pass its folder):
 
 Projects:
   install [owner/repo@tag] [--dir vendor/brand]
-                    vendor a brand's built files and pin them in brandkit.lock;
-                    with no argument, reinstall what the lock pins and verify it
+                    vendor a brand's built files and brand sheet and pin them in
+                    brandkit.lock; with no argument, reinstall what the lock pins
+  install --check   offline: exit 1 if a vendored file is missing or was edited
   update [owner/repo[@tag]]
                     move one brand (or all) to a tag (default: the newest release)
-  lint [paths...] [--config lint.json] [--compiled app.css]... [--json]
+  lint [paths...] [--config lint.json] [--compiled app.css]... [--json] [-v]
+       [--no-brand]
                     rules R1–R9 on CSS, HTML, HEEx, ~H and Go templates (default: .);
-                    the config defaults to the lint.json of the brand in brandkit.lock
+                    the config defaults to the lint.json of the brand in the nearest
+                    brandkit.lock; without a brand it exits 2 unless --no-brand.
+                    -v lists every file checked and skipped
   lint --hook       edit-time hook: reads the hook JSON on stdin, warns, never fails
   capture (--url URL | --cdp WS [--match TEXT] [--url URL]) [--out DIR]
           [--widths 375,768,1280,1920] [--height 900] [--chrome PATH]
@@ -52,7 +56,11 @@ Projects:
 
   version           print the version
 
-Exit status: 0 clean, 1 findings, 2 a usage or runtime error.
+Exit status: 0 clean; 1 findings (check, lint, capture, install --check);
+2 a usage or runtime error, including lint with no files to check or no
+brand, and capture of a page that answers 4xx/5xx. A brand package that
+doesn't load is a check finding (1). capture --no-fail exits 0 on findings.
+lint --hook always exits 0.
 `
 
 func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
@@ -75,7 +83,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "capture":
 		code, err = cmdCapture(rest, stdout)
 	case "install":
-		err = cmdInstall(rest, stdout)
+		code, err = cmdInstall(rest, stdout)
 	case "update":
 		err = cmdUpdate(rest, stdout)
 	case "version", "--version", "-v":
@@ -165,12 +173,17 @@ func cmdCheck(args []string, out io.Writer) (int, error) {
 	}
 	b, err := brand.Load(dir)
 	if err != nil {
+		rule := "schema"
+		var todo *brand.TodoError
+		if errors.As(err, &todo) {
+			rule = "todo"
+		}
 		if *asJSON {
 			enc := json.NewEncoder(out)
 			enc.SetIndent("", "  ")
-			enc.Encode([]check.Finding{{Rule: "schema", Severity: "error", Message: err.Error()}})
+			enc.Encode([]check.Finding{{Rule: rule, Severity: "error", Message: err.Error()}})
 		} else {
-			fmt.Fprintln(out, "error schema:", err)
+			fmt.Fprintf(out, "error %s: %v\n", rule, err)
 		}
 		return 1, nil
 	}
@@ -201,22 +214,61 @@ type multi []string
 func (m *multi) String() string     { return strings.Join(*m, ",") }
 func (m *multi) Set(s string) error { *m = append(*m, s); return nil }
 
-// lintConfig finds lint.json: the flag, else the first brand in the lock.
-func lintConfig(project, explicit string) (*lint.Config, string, error) {
-	if explicit != "" {
-		c, err := lint.LoadConfig(explicit)
-		return c, explicit, err
-	}
-	l, err := install.ReadLock(project)
+// findProject walks up from dir to the nearest folder holding brandkit.lock.
+func findProject(dir string) (string, bool) {
+	dir, err := filepath.Abs(dir)
 	if err != nil {
-		return nil, "", err
+		return "", false
 	}
-	for _, e := range l.Brands {
-		p := filepath.Join(project, filepath.FromSlash(e.Lint))
-		c, err := lint.LoadConfig(p)
-		return c, p, err
+	for {
+		if st, err := os.Stat(filepath.Join(dir, install.LockFile)); err == nil && st.Mode().IsRegular() {
+			return dir, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
 	}
-	return lint.DefaultConfig(), "", nil
+}
+
+// lintConfig finds lint.json: the flag, else the first brand in the
+// project's lock. brand reports whether a brand's rules were found. The
+// lock's file hashes go into the config, so unedited copies of vendored
+// files are skipped. project is "" when there is no lock.
+func lintConfig(project, explicit string) (cfg *lint.Config, brand bool, err error) {
+	var l *install.Lock
+	if project != "" {
+		if l, err = install.ReadLock(project); err != nil {
+			return nil, false, err
+		}
+	}
+	switch {
+	case explicit != "":
+		cfg, err = lint.LoadConfig(explicit)
+		brand = true
+	case l != nil && len(l.Brands) > 0:
+		e := l.Brands[0]
+		cfg, err = lint.LoadConfig(filepath.Join(project, filepath.FromSlash(e.Lint)))
+		if err != nil {
+			err = fmt.Errorf("the lint.json of %s (from %s): %w", e.Repo, install.LockFile, err)
+		}
+		brand = true
+	default:
+		cfg = lint.DefaultConfig()
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if l != nil {
+		cfg.Vendored = map[string]bool{}
+		for _, e := range l.Brands {
+			for _, h := range e.Files {
+				cfg.Vendored[h] = true
+			}
+		}
+	}
+	return cfg, brand, nil
 }
 
 func cmdLint(args []string, stdin io.Reader, out io.Writer) (int, error) {
@@ -224,6 +276,9 @@ func cmdLint(args []string, stdin io.Reader, out io.Writer) (int, error) {
 	cfgPath := fs.String("config", "", "")
 	asJSON := fs.Bool("json", false, "")
 	hook := fs.Bool("hook", false, "")
+	noBrand := fs.Bool("no-brand", false, "")
+	verbose := fs.Bool("v", false, "")
+	fs.BoolVar(verbose, "verbose", false, "")
 	var compiled multi
 	fs.Var(&compiled, "compiled", "")
 	pos, err := parse(fs, args)
@@ -234,9 +289,13 @@ func cmdLint(args []string, stdin io.Reader, out io.Writer) (int, error) {
 		runHook(stdin, out, *cfgPath)
 		return 0, nil
 	}
-	cfg, _, err := lintConfig(".", *cfgPath)
+	project, _ := findProject(".")
+	cfg, hasBrand, err := lintConfig(project, *cfgPath)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("%w; run brandkit install to restore the vendored brand files", err)
+	}
+	if !hasBrand && !*noBrand {
+		return 0, fmt.Errorf("no brand: no %s naming a brand in this folder or above it. Run brandkit install owner/repo@tag, pass --config path/to/lint.json, or pass --no-brand to run only the rules that need no brand (R1–R5, R8)", install.LockFile)
 	}
 	if len(pos) == 0 && len(compiled) == 0 {
 		pos = []string{"."}
@@ -255,11 +314,30 @@ func cmdLint(args []string, stdin io.Reader, out io.Writer) (int, error) {
 		for _, f := range res.Findings {
 			fmt.Fprintln(out, f)
 		}
-		brandName := cfg.Brand
-		if brandName == "" {
-			brandName = "no brand (R6, R7, R9 off)"
+		other := 0
+		for _, s := range res.Skipped {
+			if *verbose || s.Explicit || s.Reason != lint.SkipUnsupported {
+				fmt.Fprintf(out, "skipped %s: %s\n", s.Path, s.Reason)
+			} else {
+				other++
+			}
 		}
-		fmt.Fprintf(out, "%d files, %d errors, %d warnings, %d ignored (%s)\n", res.Files, res.Errors(), len(res.Findings)-res.Errors(), len(res.Ignored), brandName)
+		if *verbose {
+			for _, c := range res.Checked {
+				fmt.Fprintln(out, "checked", c)
+			}
+		}
+		if other > 0 {
+			fmt.Fprintf(out, "skipped %d files of types lint doesn't read (-v lists them)\n", other)
+		}
+		brandName := cfg.Brand
+		if !hasBrand {
+			brandName = "no brand: R6, R7, R9 off"
+		}
+		fmt.Fprintf(out, "%d files checked, %d errors, %d warnings, %d ignored (%s)\n", res.Files, res.Errors(), len(res.Findings)-res.Errors(), len(res.Ignored), brandName)
+	}
+	if res.Files == 0 {
+		return 0, fmt.Errorf("no files checked: lint reads .css, .html, .heex, .eex, .ex, .exs and Go template files (%s)", strings.Join(pos, " "))
 	}
 	if res.Errors() > 0 {
 		return 1, nil
@@ -268,9 +346,19 @@ func cmdLint(args []string, stdin io.Reader, out io.Writer) (int, error) {
 }
 
 // runHook is the PostToolUse edit hook: it lints the edited file and hands
-// any findings back to the agent as context. It never fails or blocks.
+// any findings back to the agent as context. It never fails or blocks, but
+// when lint can't run it says why.
 func runHook(stdin io.Reader, out io.Writer, cfgPath string) {
-	defer func() { recover() }()
+	say := func(msg string) {
+		json.NewEncoder(out).Encode(map[string]any{
+			"hookSpecificOutput": map[string]any{"hookEventName": "PostToolUse", "additionalContext": msg},
+		})
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			say(fmt.Sprintf("brandkit lint couldn't check this edit (internal error: %v). Run brandkit lint on the file to see the problem.", r))
+		}
+	}()
 	var in struct {
 		Cwd       string `json:"cwd"`
 		ToolInput struct {
@@ -284,53 +372,59 @@ func runHook(stdin io.Reader, out io.Writer, cfgPath string) {
 	if p == "" || lint.KindOf(p) == lint.KindNone {
 		return
 	}
-	project := in.Cwd
-	if project == "" {
-		project = "."
-	}
 	if !filepath.IsAbs(p) {
-		p = filepath.Join(project, p)
+		cwd := in.Cwd
+		if cwd == "" {
+			cwd = "."
+		}
+		p = filepath.Join(cwd, p)
 	}
-	cfg, _, err := lintConfig(project, cfgPath)
-	if err != nil {
-		return
+	// The project is the nearest folder above the file with brandkit.lock;
+	// without one, the session's folder if the file is in it.
+	project, hasLock := findProject(filepath.Dir(p))
+	root := project
+	if !hasLock {
+		root = filepath.Dir(p)
+		if in.Cwd != "" {
+			if r, err := filepath.Rel(in.Cwd, p); err == nil && !strings.HasPrefix(r, "..") {
+				root = in.Cwd
+			}
+		}
 	}
-	if slices(cfg.Generated, filepath.Base(p)) || strings.Contains(filepath.ToSlash(p), "/vendor/") {
-		return
-	}
-	data, err := os.ReadFile(p)
-	if err != nil {
-		return
-	}
-	rel, err := filepath.Rel(project, p)
+	rel, err := filepath.Rel(root, p)
 	if err != nil {
 		rel = p
 	}
-	found, _ := lint.Source(cfg, filepath.ToSlash(rel), data, lint.KindOf(p))
+	rel = filepath.ToSlash(rel)
+	if lint.Skipped(rel) {
+		return
+	}
+	cfg, hasBrand, err := lintConfig(project, cfgPath)
+	if err != nil {
+		say(fmt.Sprintf("brandkit lint couldn't check %s: %v. The brand rules are off until this is fixed; run `brandkit install` in %s to restore the brand's files.", rel, err, project))
+		return
+	}
+	data, err := os.ReadFile(p)
+	if err != nil || cfg.VendoredCopy(data) {
+		return
+	}
+	found, _ := lint.Source(cfg, rel, data, lint.KindOf(p))
 	if len(found) == 0 {
 		return
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "brandkit lint found %d raw design value(s) in %s. CI fails on errors; use the brand's tokens and theme roles, or add `brand-lint-ignore R#: reason` if the value is deliberate:\n", len(found), filepath.ToSlash(rel))
+	fmt.Fprintf(&b, "brandkit lint found %d raw design value(s) in %s. CI fails on errors; use the brand's tokens and theme roles, or add `brand-lint-ignore R#: reason` if the value is deliberate:\n", len(found), rel)
 	for i, f := range found {
 		if i == 20 {
-			fmt.Fprintf(&b, "… and %d more (run brandkit lint %s)\n", len(found)-20, filepath.ToSlash(rel))
+			fmt.Fprintf(&b, "… and %d more (run brandkit lint %s)\n", len(found)-20, rel)
 			break
 		}
 		fmt.Fprintf(&b, "- line %d: %s %s: %s (%s)\n", f.Line, f.Severity, f.Rule, f.Message, f.Text)
 	}
-	json.NewEncoder(out).Encode(map[string]any{
-		"hookSpecificOutput": map[string]any{"hookEventName": "PostToolUse", "additionalContext": b.String()},
-	})
-}
-
-func slices(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
+	if !hasBrand {
+		fmt.Fprintf(&b, "No %s was found above this file, so the brand rules (R6 fonts, R7 shadows, R9 icons) were off.\n", install.LockFile)
 	}
-	return false
+	say(b.String())
 }
 
 func cmdCapture(args []string, out io.Writer) (int, error) {
@@ -366,6 +460,9 @@ func cmdCapture(args []string, out io.Writer) (int, error) {
 		return 0, err
 	}
 	s := rep.Summary
+	if rep.FinalURL != "" {
+		fmt.Fprintf(out, "note: %s redirected to %s; the report is of that page\n", rep.URL, rep.FinalURL)
+	}
 	fmt.Fprintf(out, "%s: axe serious/critical %d, other %d; contrast failures %d; overflow at %v\nreport: %s\n",
 		rep.URL, s.AxeSeriousCritical, s.AxeOther, s.ContrastFailures, s.OverflowWidths, filepath.Join(o.Out, "report.json"))
 	if s.Failed() && !*noFail {
@@ -374,46 +471,74 @@ func cmdCapture(args []string, out io.Writer) (int, error) {
 	return 0, nil
 }
 
-func cmdInstall(args []string, out io.Writer) error {
+func cmdInstall(args []string, out io.Writer) (int, error) {
 	fs := flag.NewFlagSet("install", flag.ContinueOnError)
 	dir := fs.String("dir", install.DefaultDir, "")
+	checkOnly := fs.Bool("check", false, "")
 	pos, err := parse(fs, args)
 	if err != nil {
-		return err
+		return 0, err
+	}
+	if *checkOnly {
+		if len(pos) > 0 {
+			return 0, fmt.Errorf("--check takes no arguments; it checks what %s pins", install.LockFile)
+		}
+		n, err := install.Verify(".")
+		var ve *install.VerifyError
+		if errors.As(err, &ve) {
+			for _, p := range ve.Problems {
+				fmt.Fprintln(out, p)
+			}
+			fmt.Fprintf(out, "%d vendored files differ from %s; run brandkit install to restore them\n", len(ve.Problems), install.LockFile)
+			return 1, nil
+		}
+		if err != nil {
+			return 0, err
+		}
+		if n == 0 {
+			return 0, fmt.Errorf("no brands in %s to check", install.LockFile)
+		}
+		fmt.Fprintf(out, "%d brands match %s\n", n, install.LockFile)
+		return 0, nil
 	}
 	c := install.NewClient()
 	if len(pos) == 0 {
 		l, err := install.ReadLock(".")
 		if err != nil {
-			return err
+			return 0, err
 		}
 		if len(l.Brands) == 0 {
-			return fmt.Errorf("nothing in %s; give owner/repo@tag", install.LockFile)
+			return 0, fmt.Errorf("nothing in %s; give owner/repo@tag", install.LockFile)
+		}
+		var ve *install.VerifyError
+		if _, err := install.Verify("."); errors.As(err, &ve) {
+			for _, p := range ve.Problems {
+				fmt.Fprintln(out, "restoring:", p)
+			}
 		}
 		for _, e := range l.Brands {
-			e := e
 			if _, err := c.Install(".", e.Repo, e.Tag, filepath.Dir(e.Dir), &e); err != nil {
-				return err
+				return 0, err
 			}
 			fmt.Fprintf(out, "%s@%s verified in %s\n", e.Repo, e.Tag, e.Dir)
 		}
-		return nil
+		return 0, nil
 	}
 	for _, ref := range pos {
 		repo, tag, err := install.ParseRef(ref)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		if tag == "" {
-			return fmt.Errorf("%s: pin a tag (owner/repo@tag), or use brandkit update", ref)
+			return 0, fmt.Errorf("%s: pin a tag (owner/repo@tag), or use brandkit update", ref)
 		}
 		e, err := c.Install(".", repo, tag, *dir, nil)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		fmt.Fprintf(out, "installed %s@%s (%s) into %s: %d files\n", repo, tag, e.Commit[:min(12, len(e.Commit))], e.Dir, len(e.Files))
 	}
-	return nil
+	return 0, nil
 }
 
 func cmdUpdate(args []string, out io.Writer) error {

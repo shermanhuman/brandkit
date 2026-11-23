@@ -28,6 +28,9 @@ func tailwind(t *testing.T) string {
 			return p
 		}
 	}
+	if os.Getenv("BRANDKIT_REQUIRE_TOOLS") == "1" {
+		t.Fatal("tailwindcss not found (mise install)")
+	}
 	t.Skip("tailwindcss not found (mise install)")
 	return ""
 }

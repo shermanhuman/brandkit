@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -54,12 +55,16 @@ type Options struct {
 
 // Report is report.json.
 type Report struct {
-	URL     string   `json:"url"`
-	Axe     string   `json:"axe"`
-	Browser string   `json:"browser"`
-	Widths  []Width  `json:"widths"`
-	Summary Summary  `json:"summary"`
-	Notes   []string `json:"notes,omitempty"`
+	URL string `json:"url"`
+	// Status is the HTTP status of the page's main document.
+	Status int `json:"status"`
+	// FinalURL is where the page ended up when that differs from URL (a
+	// redirect, such as to a sign-in page).
+	FinalURL string  `json:"finalUrl,omitempty"`
+	Axe      string  `json:"axe"`
+	Browser  string  `json:"browser"`
+	Widths   []Width `json:"widths"`
+	Summary  Summary `json:"summary"`
 }
 
 // Summary counts the independent failures.
@@ -109,8 +114,11 @@ type Violation struct {
 
 // ContrastCheck is the computed contrast of text at a width.
 type ContrastCheck struct {
-	Checked  int               `json:"checked"`
-	Skipped  int               `json:"skipped"` // text over images or gradients
+	Checked int `json:"checked"`
+	Skipped int `json:"skipped"` // text over images or gradients
+	// Inactive counts text in disabled or inert controls, which WCAG 1.4.3
+	// exempts.
+	Inactive int               `json:"inactive"`
 	Failures []ContrastFailure `json:"failures"`
 }
 
@@ -124,7 +132,16 @@ type ContrastFailure struct {
 	Min      float64 `json:"min"`
 }
 
-const freezeCSS = `*, *::before, *::after { animation: none !important; transition: none !important; caret-color: transparent !important; scroll-behavior: auto !important; }`
+const freezeCSS = `*, *::before, *::after { transition: none !important; caret-color: transparent !important; scroll-behavior: auto !important; }`
+
+// freezeJS stops animations at a fixed frame: finite ones at their end
+// state (so a fade-in shows its text), endless ones at their start.
+const freezeJS = `document.getAnimations().forEach(a => {
+  try {
+    const t = a.effect && a.effect.getComputedTiming();
+    if (t && Number.isFinite(t.endTime)) { a.finish(); } else { a.pause(); a.currentTime = 0; }
+  } catch (e) { try { a.pause(); a.currentTime = 0; } catch (e2) {} }
+})`
 
 // Run captures a page and writes report.json and w<width>.png into opts.Out.
 func Run(ctx context.Context, opts Options) (*Report, error) {
@@ -172,8 +189,21 @@ func Run(ctx context.Context, opts Options) (*Report, error) {
 	}
 	ua, _ := chromedp.Run(tab, chromedp.Evaluate[string](`navigator.userAgent`))
 	rep := &Report{URL: opts.URL, Axe: "axe-core 4.14.1", Browser: browserVersion(ua), Summary: Summary{OverflowWidths: []int{}}}
-	if err := chromedp.Do(tab, chromedp.EmulateViewport(int64(opts.Widths[0]), int64(opts.Height)), chromedp.Navigate(opts.URL)); err != nil {
+	if err := chromedp.Do(tab, chromedp.EmulateViewport(int64(opts.Widths[0]), int64(opts.Height))); err != nil {
+		return nil, err
+	}
+	resp, err := chromedp.Run(tab, chromedp.NavigateResponse(opts.URL))
+	if err != nil {
 		return nil, fmt.Errorf("capture: loading %s: %w", opts.URL, err)
+	}
+	if resp != nil {
+		rep.Status = int(resp.Status)
+	}
+	if rep.Status >= 400 {
+		return nil, fmt.Errorf("capture: %s answered %d %s, so there is no page to check", opts.URL, rep.Status, resp.StatusText)
+	}
+	if final, err := chromedp.Run(tab, chromedp.Location()); err == nil && !sameURL(final, opts.URL) {
+		rep.FinalURL = final
 	}
 	if !opts.NoFreeze {
 		if err := chromedp.Do(tab, chromedp.Evaluate[chromedp.Void](fmt.Sprintf(
@@ -238,6 +268,7 @@ type probe struct {
 		Color    string   `json:"color"`
 		BGs      []string `json:"bgs"`
 		Image    bool     `json:"image"`
+		Inactive bool     `json:"inactive"`
 		Size     float64  `json:"size"`
 		Weight   int      `json:"weight"`
 	} `json:"texts"`
@@ -249,6 +280,11 @@ func one(tab context.Context, w int, opts Options) (*Width, error) {
 	}
 	if err := browser.Settle(tab); err != nil {
 		return nil, err
+	}
+	if !opts.NoFreeze {
+		if err := chromedp.Do(tab, chromedp.Evaluate[chromedp.Void](freezeJS+";undefined")); err != nil {
+			return nil, err
+		}
 	}
 	raw, err := chromedp.Run(tab, chromedp.Evaluate[[]byte](probeJS))
 	if err != nil {
@@ -306,6 +342,10 @@ func contrast(pr probe) ContrastCheck {
 	cc := ContrastCheck{Failures: []ContrastFailure{}}
 	seen := map[string]bool{}
 	for _, t := range pr.Texts {
+		if t.Inactive {
+			cc.Inactive++
+			continue
+		}
 		if t.Image {
 			cc.Skipped++
 			continue
@@ -379,6 +419,36 @@ const probeJS = `(() => {
     }
     return parts.join(' > ');
   };
+  // A background with alpha 1 hides everything behind it.
+  const opaque = (c) => {
+    if (!c || c === 'transparent') return false;
+    let m = c.match(/^rgba\(.*,\s*([\d.]+)\s*\)$/);
+    if (m) return parseFloat(m[1]) >= 1;
+    m = c.match(/\/\s*([\d.]+)(%?)\s*\)$/);
+    if (m) return parseFloat(m[1]) >= (m[2] ? 100 : 1);
+    return true;
+  };
+  // Disabled and inert controls are exempt from WCAG 1.4.3 (incidental).
+  const inactive = (el) => {
+    if (el.closest('[aria-disabled="true"], [inert]')) return true;
+    const d = el.closest(':disabled');
+    if (!d) return false;
+    if (d.tagName !== 'FIELDSET') return true;
+    const legend = d.querySelector(':scope > legend');
+    return !(legend && legend.contains(el));
+  };
+  // Text is invisible when it or any ancestor has opacity 0, display none
+  // or content-visibility hidden. Opacity isn't inherited and the background
+  // walk below can stop early, so this walks every ancestor on its own.
+  // (Computed visibility is inherited, so the element's own value is enough.)
+  const hidden = (el) => {
+    if (getComputedStyle(el).visibility !== 'visible') return true;
+    for (let e = el; e; e = e.parentElement) {
+      const s = getComputedStyle(e);
+      if (s.display === 'none' || parseFloat(s.opacity) === 0 || s.contentVisibility === 'hidden') return true;
+    }
+    return false;
+  };
   const iw = window.innerWidth;
   const doc = document.documentElement;
   const offenders = [];
@@ -402,16 +472,34 @@ const probeJS = `(() => {
     if (!text) continue;
     const cs = getComputedStyle(el);
     const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0 || cs.visibility !== 'visible' || cs.display === 'none' || parseFloat(cs.opacity) === 0) continue;
+    if (r.width === 0 || r.height === 0 || hidden(el)) continue;
     const bgs = []; let image = false;
     for (let e = el; e; e = e.parentElement) {
       const s = getComputedStyle(e);
       if (s.backgroundImage && s.backgroundImage !== 'none') { image = true; break; }
       bgs.push(s.backgroundColor);
-      if (/^rgb\(/.test(s.backgroundColor)) break;
+      if (opaque(s.backgroundColor)) break;
     }
-    texts.push({ selector: sel(el), text: text.slice(0, 40), color: cs.color, bgs, image,
+    texts.push({ selector: sel(el), text: text.slice(0, 40), color: cs.color, bgs, image, inactive: inactive(el),
       size: parseFloat(cs.fontSize), weight: parseInt(cs.fontWeight, 10) || 400 });
   }
   return { scrollWidth: doc.scrollWidth, innerWidth: iw, height: Math.ceil(Math.max(doc.scrollHeight, document.body ? document.body.scrollHeight : 0)), offenders, texts };
 })()`
+
+// sameURL compares two URLs as a browser lands on them: an empty path is
+// "/", and the fragment doesn't count. So http://host and http://host/ are
+// the same page, not a redirect.
+func sameURL(a, b string) bool {
+	norm := func(s string) string {
+		u, err := url.Parse(s)
+		if err != nil {
+			return s
+		}
+		u.Fragment, u.RawFragment = "", ""
+		if u.Path == "" && u.Opaque == "" {
+			u.Path = "/"
+		}
+		return u.String()
+	}
+	return norm(a) == norm(b)
+}

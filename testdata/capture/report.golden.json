@@ -1,12 +1,13 @@
 {
   "url": "http://fixture/",
+  "status": 200,
   "axe": "axe-core 4.14.1",
   "browser": "HeadlessChrome/158.0.8127.36",
   "widths": [
     {
       "width": 375,
       "screenshot": "w375.png",
-      "sha256": "8d0d75a32d8f5f99977719c6dfde3a3634c760434a80a25c024847a9e46ad265",
+      "sha256": "587506ce15c3ab2f264bfcbda1b584b075b2500572f522264ae46b3d45804c7f",
       "pageHeight": 900,
       "overflow": {
         "scrollWidth": 624,
@@ -39,6 +40,7 @@
       "contrast": {
         "checked": 8,
         "skipped": 0,
+        "inactive": 0,
         "failures": [
           {
             "selector": "body > main:nth-of-type(1) > p:nth-of-type(2)",
@@ -54,7 +56,7 @@
     {
       "width": 768,
       "screenshot": "w768.png",
-      "sha256": "4e6c01abfeea0abc4a16656a6684ab8d4690f7be1f7672b813b5a04b3926e035",
+      "sha256": "82d1c9e2d1facaf6193f43d319863a935502766a35b14eb3e83fad2abdf66484",
       "pageHeight": 900,
       "overflow": {
         "scrollWidth": 768,
@@ -82,6 +84,7 @@
       "contrast": {
         "checked": 8,
         "skipped": 0,
+        "inactive": 0,
         "failures": [
           {
             "selector": "body > main:nth-of-type(1) > p:nth-of-type(2)",
@@ -97,7 +100,7 @@
     {
       "width": 1280,
       "screenshot": "w1280.png",
-      "sha256": "bae6a37b59cbd8790e79a06e29aaa20440bb4a1835d7dfb1e69f73bbed45603f",
+      "sha256": "844eed56bdf0b787423135a4f5b1a259533c34f284a6e15449b538b80cd812ba",
       "pageHeight": 900,
       "overflow": {
         "scrollWidth": 1280,
@@ -125,6 +128,7 @@
       "contrast": {
         "checked": 8,
         "skipped": 0,
+        "inactive": 0,
         "failures": [
           {
             "selector": "body > main:nth-of-type(1) > p:nth-of-type(2)",
@@ -140,7 +144,7 @@
     {
       "width": 1920,
       "screenshot": "w1920.png",
-      "sha256": "4d7f32ec3d6e5d17aa778670897319bf69a3cea2be234db135a85bb27695beb0",
+      "sha256": "3131b88f134e7126d744bca9c6e7f752b52014506730239d84fa64facb71bc9a",
       "pageHeight": 900,
       "overflow": {
         "scrollWidth": 1920,
@@ -168,6 +172,7 @@
       "contrast": {
         "checked": 8,
         "skipped": 0,
+        "inactive": 0,
         "failures": [
           {
             "selector": "body > main:nth-of-type(1) > p:nth-of-type(2)",

@@ -1,6 +1,7 @@
 package check
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,5 +102,37 @@ func TestSchemaFailureStopsLoad(t *testing.T) {
 	edit(t, filepath.Join(dir, "tokens", "night.tokens.json"), `"{palette.ink-950}"`, `"{palette.missing}"`)
 	if _, err := brand.Load(dir); err == nil || !strings.Contains(err.Error(), "palette.missing") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// TestTodoPlaceholders: a token value left as "TODO" fails, naming the
+// token; "todo" in another case is a value like any other (change 4).
+func TestTodoPlaceholders(t *testing.T) {
+	dir := copyDir(t, filepath.Join("..", "..", "testdata", "brands", "base"))
+	prim := filepath.Join(dir, "tokens", "primitives.tokens.json")
+	edit(t, prim, `"$value": [
+        "Fira Mono",
+        "ui-monospace",
+        "monospace"
+      ]`, `"$value": "TODO"`)
+	edit(t, prim, `"$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.55,
+          0.03,
+          250
+        ],
+        "hex": "#657383"
+      }`, `"$value": "TODO"`)
+	_, err := brand.Load(dir)
+	var todo *brand.TodoError
+	if !errors.As(err, &todo) || len(todo.Tokens) != 2 || !strings.Contains(err.Error(), "font.mono") || !strings.Contains(err.Error(), "palette.ink-500") {
+		t.Fatalf("got %v", err)
+	}
+	// A lowercase "todo" font name is not the placeholder.
+	edit(t, prim, `"$value": "TODO"`, `"$value": {"colorSpace": "oklch", "components": [0.55, 0.03, 250], "hex": "#657383"}`)
+	edit(t, prim, `"$value": "TODO"`, `"$value": "todo"`)
+	if _, err := brand.Load(dir); err != nil {
+		t.Fatal(err)
 	}
 }

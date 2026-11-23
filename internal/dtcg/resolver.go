@@ -52,7 +52,7 @@ func ParseResolver(data []byte, dir string) (*Resolver, error) {
 	doc := v.(*Object)
 	r := &Resolver{Name: doc.String("name"), Description: doc.String("description"), Dir: dir, doc: doc, loaded: map[string]*Object{}}
 	ro, _ := doc.Values["resolutionOrder"].([]any)
-	for i, e := range ro {
+	for _, e := range ro {
 		o := e.(*Object)
 		var name, kind string
 		var entry *Object
@@ -61,6 +61,7 @@ func ParseResolver(data []byte, dir string) (*Resolver, error) {
 			if err != nil {
 				return nil, err
 			}
+			entry = overrideRef(entry, o)
 		} else {
 			kind, name, entry = o.String("type"), o.String("name"), o
 		}
@@ -81,7 +82,6 @@ func ParseResolver(data []byte, dir string) (*Resolver, error) {
 			}
 			r.modifiers = append(r.modifiers, m)
 		}
-		_ = i
 	}
 	// Load every source now, so a broken file or a set cycle fails early.
 	for _, e := range r.order {
@@ -157,7 +157,10 @@ func (r *Resolver) walkContext(e *Object, context string, stack []string, fn fun
 			if kind != "set" {
 				return fmt.Errorf("dtcg: resolver: %s can reference sets only, not modifier %s", name, n)
 			}
-			c := Clone(sub).(*Object)
+			c := overrideRef(sub, o)
+			if c == sub {
+				c = Clone(sub).(*Object)
+			}
 			c.Set("type", "set")
 			c.Set("name", n)
 			if err := r.walkContext(c, "", stack, fn); err != nil {
@@ -168,12 +171,30 @@ func (r *Resolver) walkContext(e *Object, context string, stack []string, fn fun
 			if err != nil {
 				return err
 			}
-			if err := fn(doc); err != nil {
+			if err := fn(overrideRef(doc, o)); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// overrideRef applies the keys beside $ref in ref to a clone of target.
+// They override target's top-level properties shallowly: an object beside
+// $ref replaces the referenced one whole (Resolver 2025.10 §4.2.2: "tools
+// MUST flatten these shallowly, meaning objects and arrays are not merged").
+// With no sibling keys, target itself is returned.
+func overrideRef(target, ref *Object) *Object {
+	if len(ref.Keys) <= 1 {
+		return target
+	}
+	out := Clone(target).(*Object)
+	for _, k := range ref.Keys {
+		if k != "$ref" {
+			out.Set(k, Clone(ref.Values[k]))
+		}
+	}
+	return out
 }
 
 func (r *Resolver) loadFile(ref string) (*Object, error) {
