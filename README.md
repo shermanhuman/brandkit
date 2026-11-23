@@ -40,7 +40,7 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
 | `name`, `description`, `repo` | | shown in the README; `repo` (owner/name) goes in its install section |
 | `resolver` | required | the resolver document |
 | `modifier` | `theme` | the resolver modifier whose contexts are the themes |
-| `themes.<context>` | required | `daisyui` (theme name), `colorScheme` (dark/light), `default` (exactly one), `prefersDark`, `selector` (for tokens.css; default `[data-theme="<daisyui>"]`), `label`, `github` (dark/light: which GitHub scheme shows it in the README) |
+| `themes.<context>` | required | `daisyui` (theme name), `colorScheme` (dark/light), `default` (exactly one), `prefersDark`, `selector` (for tokens.css; default `[data-theme="<daisyui>"]`. Other themes' blocks hold only what differs, so unless the default theme's selector is `:root`, its block also lists every other theme's selector), `label`, `github` (dark/light: which GitHub scheme shows it in the README) |
 | `out` | `export` | folder for generated files |
 | `tokensCss.file` / `.include` / `.template` / `.header` | `ui/tokens.css`, `["type:color"]` | `include` takes path prefixes or `type:<name>`. `template` is a Go `text/template` that writes the whole file, so a legacy file can be reproduced byte for byte (fields: `.Brand`, `.GeneratedBy`, `.Default`, `.Themes`, each with `.Name .Selector .ColorScheme .Default .Decls .Changed`, and `.Value "<name>"`) |
 | `brandCss.file` | `ui/brand.css` | every token not in tokens.css (type, spacing, radius, motion) |

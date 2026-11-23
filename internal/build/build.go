@@ -252,7 +252,27 @@ func TokensCSS(b *brand.Brand) ([]byte, error) {
 	if header == "" {
 		header = b.Config.Name + " colours."
 	}
+	themes[0].Selector = baselineSelector(themes)
 	return writeBlocks(fmt.Sprintf("/* %s %s */\n", header, generatedBy(b)), themes, true), nil
+}
+
+// baselineSelector is the selector for the default theme's complete block.
+// The other themes' blocks hold only what differs, so the baseline must
+// also apply wherever they do. With a :root default it already does (custom
+// properties inherit); otherwise, such as the default [data-theme="…"]
+// selectors, every theme's selector joins the baseline's. The delta blocks
+// come later at the same specificity, so they still win.
+func baselineSelector(themes []*ThemeDecls) string {
+	sels := []string{themes[0].Selector}
+	if sels[0] == ":root" {
+		return sels[0]
+	}
+	for _, td := range themes[1:] {
+		if !slices.Contains(sels, td.Selector) {
+			sels = append(sels, td.Selector)
+		}
+	}
+	return strings.Join(sels, ",\n")
 }
 
 // BrandCSS writes every token that isn't in tokens.css: type, spacing,
