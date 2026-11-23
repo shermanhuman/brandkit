@@ -1,0 +1,63 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "$description": "Fixture base brand: night roles (the default).",
+  "color": {
+    "$type": "color",
+    "bg": {
+      "$value": "{palette.ink-950}"
+    },
+    "surface": {
+      "$value": "{palette.ink-900}"
+    },
+    "surface-raised": {
+      "$value": "{palette.ink-800}"
+    },
+    "border": {
+      "$value": "{palette.ink-700}"
+    },
+    "text": {
+      "$value": "{palette.ink-50}",
+      "$extensions": {
+        "com.mapleset.css": {
+          "comment": "body text"
+        }
+      }
+    },
+    "text-muted": {
+      "$value": "{palette.ink-300}"
+    },
+    "link": {
+      "$value": "{palette.teal-300}"
+    },
+    "primary": {
+      "$value": "{palette.teal-300}"
+    },
+    "on-primary": {
+      "$value": "{palette.ink-950}"
+    },
+    "accent": {
+      "$value": "{palette.coral-300}"
+    },
+    "on-accent": {
+      "$value": "{palette.ink-950}"
+    },
+    "success": {
+      "$value": "{palette.green-300}"
+    },
+    "warning": {
+      "$value": "{palette.amber-200}"
+    },
+    "danger": {
+      "$value": "{palette.red-300}"
+    },
+    "info": {
+      "$value": "{palette.blue-300}"
+    },
+    "on-status": {
+      "$value": "{palette.ink-950}"
+    },
+    "focus": {
+      "$value": "{palette.amber-200}"
+    }
+  }
+}

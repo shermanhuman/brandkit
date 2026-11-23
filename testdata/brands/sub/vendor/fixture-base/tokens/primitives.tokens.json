@@ -1,0 +1,447 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "$description": "Fixture base brand: primitives (no modes).",
+  "palette": {
+    "$type": "color",
+    "$description": "The fixture palette, authored in OKLCH with the sRGB hex each displays as.",
+    "ink-950": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.17,
+          0.02,
+          250
+        ],
+        "hex": "#091018"
+      }
+    },
+    "ink-900": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.21,
+          0.025,
+          250
+        ],
+        "hex": "#0f1923"
+      }
+    },
+    "ink-800": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.26,
+          0.03,
+          250
+        ],
+        "hex": "#192532"
+      }
+    },
+    "ink-700": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.36,
+          0.03,
+          250
+        ],
+        "hex": "#313f4d"
+      }
+    },
+    "ink-500": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.55,
+          0.03,
+          250
+        ],
+        "hex": "#657383"
+      }
+    },
+    "ink-300": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.78,
+          0.02,
+          250
+        ],
+        "hex": "#aeb9c4"
+      }
+    },
+    "ink-100": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.95,
+          0.008,
+          250
+        ],
+        "hex": "#ebeff4"
+      }
+    },
+    "ink-50": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.985,
+          0.004,
+          250
+        ],
+        "hex": "#f8fafd"
+      }
+    },
+    "teal-300": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.82,
+          0.11,
+          190
+        ],
+        "hex": "#60dbd4"
+      }
+    },
+    "teal-700": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.47,
+          0.09,
+          200
+        ],
+        "hex": "#00696f"
+      },
+      "$description": "Outside sRGB as written; the hex is its CSS Color 4 gamut mapping."
+    },
+    "coral-300": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.78,
+          0.13,
+          35
+        ],
+        "hex": "#ff987e"
+      }
+    },
+    "coral-700": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.52,
+          0.17,
+          30
+        ],
+        "hex": "#b63325"
+      }
+    },
+    "green-300": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.83,
+          0.14,
+          150
+        ],
+        "hex": "#7fe196"
+      }
+    },
+    "green-800": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.43,
+          0.11,
+          150
+        ],
+        "hex": "#10602d"
+      }
+    },
+    "amber-200": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.89,
+          0.13,
+          90
+        ],
+        "hex": "#fcd76f"
+      }
+    },
+    "amber-800": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.47,
+          0.1,
+          70
+        ],
+        "hex": "#7e4f04"
+      }
+    },
+    "red-300": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.76,
+          0.14,
+          22
+        ],
+        "hex": "#fe8a88"
+      }
+    },
+    "red-700": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.5,
+          0.18,
+          25
+        ],
+        "hex": "#b32228"
+      }
+    },
+    "blue-300": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.82,
+          0.08,
+          250
+        ],
+        "hex": "#9dc9f7"
+      }
+    },
+    "blue-700": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.46,
+          0.13,
+          260
+        ],
+        "hex": "#29559f"
+      }
+    }
+  },
+  "font": {
+    "$type": "fontFamily",
+    "sans": {
+      "$value": [
+        "Atkinson Hyperlegible",
+        "system-ui",
+        "sans-serif"
+      ],
+      "$description": "Body and UI text."
+    },
+    "mono": {
+      "$value": [
+        "Fira Mono",
+        "ui-monospace",
+        "monospace"
+      ],
+      "$description": "Code, figures in tables."
+    }
+  },
+  "weight": {
+    "$type": "fontWeight",
+    "regular": {
+      "$value": 400
+    },
+    "bold": {
+      "$value": 700
+    }
+  },
+  "type": {
+    "$type": "typography",
+    "display": {
+      "$value": {
+        "fontFamily": "{font.sans}",
+        "fontSize": {
+          "value": 2.25,
+          "unit": "rem"
+        },
+        "fontWeight": "{weight.bold}",
+        "letterSpacing": {
+          "value": -0.02,
+          "unit": "rem"
+        },
+        "lineHeight": 1.1
+      },
+      "$description": "Page titles."
+    },
+    "heading": {
+      "$value": {
+        "fontFamily": "{font.sans}",
+        "fontSize": {
+          "value": 1.5,
+          "unit": "rem"
+        },
+        "fontWeight": "{weight.bold}",
+        "letterSpacing": {
+          "value": 0,
+          "unit": "rem"
+        },
+        "lineHeight": 1.25
+      },
+      "$description": "Section headings."
+    },
+    "body": {
+      "$value": {
+        "fontFamily": "{font.sans}",
+        "fontSize": {
+          "value": 1,
+          "unit": "rem"
+        },
+        "fontWeight": "{weight.regular}",
+        "letterSpacing": {
+          "value": 0,
+          "unit": "rem"
+        },
+        "lineHeight": 1.5
+      },
+      "$description": "Running text."
+    },
+    "small": {
+      "$value": {
+        "fontFamily": "{font.sans}",
+        "fontSize": {
+          "value": 0.875,
+          "unit": "rem"
+        },
+        "fontWeight": "{weight.regular}",
+        "letterSpacing": {
+          "value": 0.01,
+          "unit": "rem"
+        },
+        "lineHeight": 1.4
+      },
+      "$description": "Captions and table cells."
+    },
+    "code": {
+      "$value": {
+        "fontFamily": "{font.mono}",
+        "fontSize": {
+          "value": 0.875,
+          "unit": "rem"
+        },
+        "fontWeight": "{weight.regular}",
+        "letterSpacing": {
+          "value": 0,
+          "unit": "rem"
+        },
+        "lineHeight": 1.5
+      },
+      "$description": "Code and IDs."
+    }
+  },
+  "space": {
+    "$type": "dimension",
+    "$description": "The spacing scale.",
+    "1": {
+      "$value": {
+        "value": 0.25,
+        "unit": "rem"
+      }
+    },
+    "2": {
+      "$value": {
+        "value": 0.5,
+        "unit": "rem"
+      }
+    },
+    "3": {
+      "$value": {
+        "value": 0.75,
+        "unit": "rem"
+      }
+    },
+    "4": {
+      "$value": {
+        "value": 1,
+        "unit": "rem"
+      }
+    },
+    "6": {
+      "$value": {
+        "value": 1.5,
+        "unit": "rem"
+      }
+    },
+    "8": {
+      "$value": {
+        "value": 2,
+        "unit": "rem"
+      }
+    }
+  },
+  "radius": {
+    "$type": "dimension",
+    "$description": "The radius scale.",
+    "selector": {
+      "$value": {
+        "value": 0.25,
+        "unit": "rem"
+      },
+      "$description": "Checkboxes, toggles, badges."
+    },
+    "field": {
+      "$value": {
+        "value": 0.375,
+        "unit": "rem"
+      },
+      "$description": "Buttons and inputs."
+    },
+    "box": {
+      "$value": {
+        "value": 0.75,
+        "unit": "rem"
+      },
+      "$description": "Cards, modals, alerts."
+    }
+  },
+  "size": {
+    "$type": "dimension",
+    "selector": {
+      "$value": {
+        "value": 0.25,
+        "unit": "rem"
+      }
+    },
+    "field": {
+      "$value": {
+        "value": 0.25,
+        "unit": "rem"
+      }
+    }
+  },
+  "border": {
+    "width": {
+      "$type": "dimension",
+      "$value": {
+        "value": 1,
+        "unit": "px"
+      }
+    }
+  },
+  "motion": {
+    "fast": {
+      "$type": "duration",
+      "$value": {
+        "value": 120,
+        "unit": "ms"
+      }
+    },
+    "ease": {
+      "$type": "cubicBezier",
+      "$value": [
+        0.2,
+        0,
+        0,
+        1
+      ]
+    }
+  }
+}

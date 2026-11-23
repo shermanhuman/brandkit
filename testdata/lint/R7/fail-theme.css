@@ -1,0 +1,7 @@
+@theme {
+  --shadow-glow: 0 0 10px var(--color-primary);
+  --shadow-*: initial;
+}
+@utility lifted {
+  box-shadow: 0 2px 4px var(--color-border);
+}

@@ -1,0 +1,255 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "$description": "Fixture base brand: rules and the DaisyUI mapping (mode-neutral).",
+  "$extensions": {
+    "com.mapleset.brand": {
+      "shadows": "none",
+      "mark": "assets/mark.svg",
+      "lockup": {
+        "night": "assets/lockup-night.svg",
+        "day": "assets/lockup-day.svg"
+      },
+      "clearSpace": {
+        "ratio": 0.5,
+        "of": "mark height",
+        "note": "Keep half the mark's height clear on every side of the lockup."
+      },
+      "accent": {
+        "token": "color.accent",
+        "bodyText": [
+          "color.text",
+          "color.text-muted"
+        ],
+        "note": "The accent marks highlights and large headings, never running text."
+      },
+      "icons": {
+        "set": "lucide",
+        "strokeWidth": 2,
+        "prefix": "lucide-",
+        "usage": "<.icon name=\"lucide-…\" /> in HEEx; embedded Lucide SVGs drawn with currentColor elsewhere",
+        "examples": [
+          "house",
+          "search",
+          "settings",
+          "circle-alert"
+        ]
+      },
+      "radius": [
+        "radius.selector",
+        "radius.field",
+        "radius.box"
+      ],
+      "spacing": [
+        "space.1",
+        "space.2",
+        "space.3",
+        "space.4",
+        "space.6",
+        "space.8"
+      ],
+      "type": [
+        "type.display",
+        "type.heading",
+        "type.body",
+        "type.small",
+        "type.code"
+      ],
+      "fonts": {
+        "sans": "font.sans",
+        "mono": "font.mono"
+      },
+      "roles": [
+        {
+          "token": "color.bg",
+          "use": "page background"
+        },
+        {
+          "token": "color.surface",
+          "use": "cards, panels"
+        },
+        {
+          "token": "color.surface-raised",
+          "use": "menus, popovers"
+        },
+        {
+          "token": "color.border",
+          "use": "dividers, field outlines"
+        },
+        {
+          "token": "color.text",
+          "use": "body text"
+        },
+        {
+          "token": "color.text-muted",
+          "use": "secondary text"
+        },
+        {
+          "token": "color.link",
+          "use": "links"
+        },
+        {
+          "token": "color.primary",
+          "use": "primary buttons"
+        },
+        {
+          "token": "color.on-primary",
+          "use": "text on primary"
+        },
+        {
+          "token": "color.accent",
+          "use": "highlights, large headings"
+        },
+        {
+          "token": "color.on-accent",
+          "use": "text on accent"
+        },
+        {
+          "token": "color.success",
+          "use": "success"
+        },
+        {
+          "token": "color.warning",
+          "use": "warning"
+        },
+        {
+          "token": "color.danger",
+          "use": "errors, destructive actions"
+        },
+        {
+          "token": "color.info",
+          "use": "information"
+        },
+        {
+          "token": "color.on-status",
+          "use": "text on status colours"
+        },
+        {
+          "token": "color.focus",
+          "use": "focus ring"
+        }
+      ],
+      "contrast": [
+        {
+          "fg": "color.text",
+          "bg": "color.bg",
+          "min": 4.5,
+          "use": "body text"
+        },
+        {
+          "fg": "color.text",
+          "bg": "color.surface",
+          "min": 4.5,
+          "use": "text on cards"
+        },
+        {
+          "fg": "color.text-muted",
+          "bg": "color.bg",
+          "min": 4.5,
+          "use": "secondary text"
+        },
+        {
+          "fg": "color.text-muted",
+          "bg": "color.surface",
+          "min": 4.5,
+          "use": "secondary text on cards"
+        },
+        {
+          "fg": "color.link",
+          "bg": "color.bg",
+          "min": 4.5,
+          "use": "links"
+        },
+        {
+          "fg": "color.on-primary",
+          "bg": "color.primary",
+          "min": 4.5,
+          "use": "primary buttons"
+        },
+        {
+          "fg": "color.on-accent",
+          "bg": "color.accent",
+          "min": 4.5,
+          "use": "accent badges"
+        },
+        {
+          "fg": "color.accent",
+          "bg": "color.bg",
+          "min": 3,
+          "use": "large accent headings"
+        },
+        {
+          "fg": "color.on-status",
+          "bg": "color.success",
+          "min": 4.5,
+          "use": "success alerts"
+        },
+        {
+          "fg": "color.on-status",
+          "bg": "color.warning",
+          "min": 4.5,
+          "use": "warning alerts"
+        },
+        {
+          "fg": "color.on-status",
+          "bg": "color.danger",
+          "min": 4.5,
+          "use": "error alerts"
+        },
+        {
+          "fg": "color.on-status",
+          "bg": "color.info",
+          "min": 4.5,
+          "use": "info alerts"
+        },
+        {
+          "fg": "color.focus",
+          "bg": "color.bg",
+          "min": 3,
+          "use": "focus ring"
+        }
+      ],
+      "do": [
+        "Use the role tokens (bg-base-100, text-base-content, btn-primary), never raw colours.",
+        "Keep running text in color.text or color.text-muted.",
+        "Draw icons from Lucide at the brand's stroke width."
+      ],
+      "dont": [
+        "No shadows or glows: separate surfaces with color.border and color.surface.",
+        "Don't set the accent on body text.",
+        "Don't stretch, recolour or crowd the lockup."
+      ]
+    },
+    "com.mapleset.daisyui": {
+      "colors": {
+        "base-100": "{color.bg}",
+        "base-200": "{color.surface}",
+        "base-300": "{color.surface-raised}",
+        "base-content": "{color.text}",
+        "primary": "{color.primary}",
+        "primary-content": "{color.on-primary}",
+        "secondary": "{color.link}",
+        "secondary-content": "{color.on-primary}",
+        "accent": "{color.accent}",
+        "accent-content": "{color.on-accent}",
+        "neutral": "{color.border}",
+        "neutral-content": "{color.text}",
+        "info": "{color.info}",
+        "info-content": "{color.on-status}",
+        "success": "{color.success}",
+        "success-content": "{color.on-status}",
+        "warning": "{color.warning}",
+        "warning-content": "{color.on-status}",
+        "error": "{color.danger}",
+        "error-content": "{color.on-status}"
+      },
+      "radius-selector": "{radius.selector}",
+      "radius-field": "{radius.field}",
+      "radius-box": "{radius.box}",
+      "size-selector": "{size.selector}",
+      "size-field": "{size.field}",
+      "border": "{border.width}",
+      "depth": 0,
+      "noise": 0
+    }
+  }
+}

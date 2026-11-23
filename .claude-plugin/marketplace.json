@@ -1,0 +1,19 @@
+{
+  "name": "brandkit",
+  "description": "brandkit: brand packages from DTCG tokens, and the edit-time brand lint for coding agents.",
+  "owner": {
+    "name": "Sherman Boyd"
+  },
+  "plugins": [
+    {
+      "name": "brandkit",
+      "description": "Edit-time brand lint: warns about raw colours, sizes, fonts, shadows and icons outside the brand package.",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/shermanhuman/brandkit.git",
+        "path": "./agent-plugin",
+        "ref": "main"
+      }
+    }
+  ]
+}

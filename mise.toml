@@ -1,0 +1,15 @@
+[tools]
+go = "1.27.4"
+"github:tailwindlabs/tailwindcss" = "4.3.5"
+
+# Chrome for Testing headless shell, the browser `brandkit capture` and the
+# README specimens use. Chrome for Testing ships no linux-arm64 build.
+[tools."http:chrome-headless-shell"]
+version = "158.0.8127.36"
+bin_path = "."
+strip_components = 1
+
+[tools."http:chrome-headless-shell".platforms]
+linux-x64 = { url = "https://storage.googleapis.com/chrome-for-testing-public/{{ version }}/linux64/chrome-headless-shell-linux64.zip", checksum = "sha256:2d3a23017323c54fd457a678e4351f895c4076d8050e39d5aa6247f93448b73a" }
+macos-arm64 = { url = "https://storage.googleapis.com/chrome-for-testing-public/{{ version }}/mac-arm64/chrome-headless-shell-mac-arm64.zip", checksum = "sha256:c24d40a3786322ff3a5e3ac6eed162226cbaf07ebe468715407827226b0f8897" }
+macos-x64 = { url = "https://storage.googleapis.com/chrome-for-testing-public/{{ version }}/mac-x64/chrome-headless-shell-mac-x64.zip", checksum = "sha256:e0c5d07d8f5bcc5bdd5ef370e7daf3770856b585fcc9eecf441c7e3bb2e3d1cf" }

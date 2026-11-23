@@ -1,0 +1,3 @@
+/* brand-lint-ignore R5: the third-party widget needs its own white */
+.widget { background: #ffffff; }
+.chart { color: #123456; } /* brand-lint-ignore R5: chart series colour from the dataviz palette */

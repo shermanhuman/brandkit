@@ -1,0 +1,13 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "$description": "Fixture sub brand: night overrides.",
+  "color": {
+    "$type": "color",
+    "primary": {
+      "$value": "{palette.violet-300}"
+    },
+    "link": {
+      "$value": "{palette.violet-300}"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "$description": "Fixture sub brand: what it adds to the base.",
+  "palette": {
+    "$type": "color",
+    "violet-300": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.8,
+          0.11,
+          300
+        ],
+        "hex": "#c8aefa"
+      }
+    },
+    "violet-700": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [
+          0.48,
+          0.17,
+          300
+        ],
+        "hex": "#6e3ead"
+      }
+    }
+  },
+  "$extensions": {
+    "com.mapleset.brand": {
+      "mark": "assets/mark.svg",
+      "lockup": {
+        "night": "assets/lockup-night.svg",
+        "day": "assets/lockup-day.svg"
+      },
+      "do": [
+        "Use violet for the primary action only; everything else follows the base brand."
+      ]
+    }
+  }
+}

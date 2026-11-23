@@ -1,0 +1,10 @@
+.card {
+  background: #fff;
+  color: rgb(0 0 0);
+  font-size: 14px;
+  border-color: var(--line, #cccccc);
+}
+
+:root {
+  --brand-extra: oklch(0.5 0.1 20);
+}

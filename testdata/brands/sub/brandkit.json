@@ -1,0 +1,45 @@
+{
+  "name": "Fixture Sub",
+  "description": "A generic brand that extends Fixture Base through a resolver set, with a legacy tokens.css template.",
+  "repo": "example/fixture-sub-brand",
+  "resolver": "tokens/sub.resolver.json",
+  "themes": {
+    "night": {
+      "label": "Night",
+      "daisyui": "fixture-sub",
+      "colorScheme": "dark",
+      "default": true,
+      "prefersDark": true,
+      "selector": ":root"
+    },
+    "day": {
+      "label": "Day",
+      "daisyui": "fixture-sub-day",
+      "colorScheme": "light",
+      "selector": "[data-theme=\"light\"]"
+    }
+  },
+  "tokensCss": {
+    "template": "templates/tokens.css.tmpl",
+    "include": [
+      "color"
+    ]
+  },
+  "fonts": [
+    {
+      "family": "Atkinson Hyperlegible",
+      "css": "vendor/fixture-base/fonts/fonts.css",
+      "license": "vendor/fixture-base/fonts/OFL-AtkinsonHyperlegible.txt"
+    },
+    {
+      "family": "Fira Mono",
+      "css": "vendor/fixture-base/fonts/fonts.css",
+      "license": "vendor/fixture-base/fonts/OFL-FiraMono.txt"
+    }
+  ],
+  "install": [
+    "tokens",
+    "vendor",
+    "assets"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "$description": "Fixture base brand: day roles.",
+  "color": {
+    "$type": "color",
+    "bg": {
+      "$value": "{palette.ink-50}"
+    },
+    "surface": {
+      "$value": "{palette.ink-100}"
+    },
+    "surface-raised": {
+      "$value": "{palette.ink-50}"
+    },
+    "border": {
+      "$value": "{palette.ink-300}"
+    },
+    "text": {
+      "$value": "{palette.ink-950}"
+    },
+    "text-muted": {
+      "$value": "{palette.ink-700}"
+    },
+    "link": {
+      "$value": "{palette.teal-700}"
+    },
+    "primary": {
+      "$value": "{palette.teal-700}"
+    },
+    "on-primary": {
+      "$value": "{palette.ink-50}"
+    },
+    "accent": {
+      "$value": "{palette.coral-700}"
+    },
+    "on-accent": {
+      "$value": "{palette.ink-50}"
+    },
+    "success": {
+      "$value": "{palette.green-800}"
+    },
+    "warning": {
+      "$value": "{palette.amber-800}"
+    },
+    "danger": {
+      "$value": "{palette.red-700}"
+    },
+    "info": {
+      "$value": "{palette.blue-700}"
+    },
+    "on-status": {
+      "$value": "{palette.ink-50}"
+    },
+    "focus": {
+      "$value": "{palette.teal-700}"
+    }
+  }
+}

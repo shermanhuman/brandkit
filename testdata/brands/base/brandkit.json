@@ -1,0 +1,15 @@
+{
+  "name": "Fixture Base",
+  "description": "A generic brand used by brandkit's tests: two themes, every output.",
+  "repo": "example/fixture-base-brand",
+  "resolver": "tokens/base.resolver.json",
+  "themes": {
+    "night": { "label": "Night", "daisyui": "fixture", "colorScheme": "dark", "default": true, "prefersDark": true, "selector": ":root" },
+    "day": { "label": "Day", "daisyui": "fixture-day", "colorScheme": "light" }
+  },
+  "fonts": [
+    { "family": "Atkinson Hyperlegible", "css": "fonts/fonts.css", "license": "fonts/OFL-AtkinsonHyperlegible.txt" },
+    { "family": "Fira Mono", "css": "fonts/fonts.css", "license": "fonts/OFL-FiraMono.txt" }
+  ],
+  "install": ["tokens", "fonts", "assets"]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "brandkit",
+  "version": "0.1.0",
+  "description": "Warns at edit time when UI code uses raw colours, sizes, fonts, shadows or icons outside the installed brand package (brandkit lint R1–R9).",
+  "author": { "name": "Sherman Boyd" },
+  "homepage": "https://github.com/shermanhuman/brandkit",
+  "repository": "https://github.com/shermanhuman/brandkit",
+  "license": "MIT",
+  "keywords": ["design-tokens", "dtcg", "daisyui", "lint", "brand"]
+}

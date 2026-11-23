@@ -1,0 +1,44 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/resolver.json",
+  "version": "2025.10",
+  "name": "fixture-base",
+  "description": "Fixture base brand: primitives and rules, then the theme roles.",
+  "sets": {
+    "base": {
+      "sources": [
+        {
+          "$ref": "primitives.tokens.json"
+        },
+        {
+          "$ref": "semantic.tokens.json"
+        }
+      ]
+    }
+  },
+  "modifiers": {
+    "theme": {
+      "description": "Night (default) or day.",
+      "default": "night",
+      "contexts": {
+        "night": [
+          {
+            "$ref": "night.tokens.json"
+          }
+        ],
+        "day": [
+          {
+            "$ref": "day.tokens.json"
+          }
+        ]
+      }
+    }
+  },
+  "resolutionOrder": [
+    {
+      "$ref": "#/sets/base"
+    },
+    {
+      "$ref": "#/modifiers/theme"
+    }
+  ]
+}

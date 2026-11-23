@@ -1,0 +1,21 @@
+{
+  "description": "After an edit to CSS, HTML, HEEx, Elixir or Go template files, runs brandkit lint on that file and tells the agent about raw design values, or why lint couldn't run. Warns only and always exits 0. It finds brandkit on PATH or through mise (looked up from the project folder, never installed); when neither has it but the project has a brandkit.lock, it says so.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh",
+            "args": [
+              "-c",
+              "in=$(cat)\nf=$(printf '%s' \"$in\" | sed -n 's/.*\"file_path\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p')\ncase \"$f\" in *.css|*.html|*.htm|*.heex|*.eex|*.leex|*.tmpl|*.gohtml|*.gotmpl|*.tpl|*.ex|*.exs) ;; *) exit 0 ;; esac\nd=$(dirname \"$f\"); p=; lock=\nwhile [ -z \"$lock\" ]; do [ -f \"$d/brandkit.lock\" ] && lock=$d; n=$(dirname \"$d\"); [ \"$n\" = \"$d\" ] && break; d=$n; done\np=$(command -v brandkit)\ncase \"$p\" in */shims/*) p= ;; esac\nm=$(command -v mise)\n[ -n \"$p\" ] && [ -n \"$m\" ] && [ \"$p\" -ef \"$m\" ] && p=\nif [ -z \"$p\" ] && [ -n \"$m\" ]; then p=$(MISE_OFFLINE=1 mise -C \"${lock:-$(dirname \"$f\")}\" which brandkit </dev/null 2>/dev/null); case \"$p\" in */shims/*) p= ;; esac; fi\nif [ -n \"$p\" ]; then printf '%s' \"$in\" | \"$p\" lint --hook\nelif [ -n \"$lock\" ]; then printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"This project has a brandkit.lock, but brandkit is not installed, so the edit-time brand lint did not run. Install it (mise use github:shermanhuman/brandkit) to get brand findings at edit time.\"}}'\nfi\nexit 0"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

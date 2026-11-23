@@ -1,0 +1,59 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/resolver.json",
+  "version": "2025.10",
+  "name": "fixture-sub",
+  "description": "Fixture sub brand: the vendored base, then the sub brand's changes (later wins).",
+  "sets": {
+    "base": {
+      "sources": [
+        {
+          "$ref": "../vendor/fixture-base/tokens/primitives.tokens.json"
+        },
+        {
+          "$ref": "../vendor/fixture-base/tokens/semantic.tokens.json"
+        }
+      ]
+    },
+    "sub": {
+      "sources": [
+        {
+          "$ref": "sub.tokens.json"
+        }
+      ]
+    }
+  },
+  "modifiers": {
+    "theme": {
+      "default": "night",
+      "contexts": {
+        "night": [
+          {
+            "$ref": "../vendor/fixture-base/tokens/night.tokens.json"
+          },
+          {
+            "$ref": "sub-night.tokens.json"
+          }
+        ],
+        "day": [
+          {
+            "$ref": "../vendor/fixture-base/tokens/day.tokens.json"
+          },
+          {
+            "$ref": "sub-day.tokens.json"
+          }
+        ]
+      }
+    }
+  },
+  "resolutionOrder": [
+    {
+      "$ref": "#/sets/base"
+    },
+    {
+      "$ref": "#/sets/sub"
+    },
+    {
+      "$ref": "#/modifiers/theme"
+    }
+  ]
+}

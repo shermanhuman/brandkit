@@ -1,0 +1,13 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "$description": "Fixture sub brand: day overrides.",
+  "color": {
+    "$type": "color",
+    "primary": {
+      "$value": "{palette.violet-700}"
+    },
+    "link": {
+      "$value": "{palette.violet-700}"
+    }
+  }
+}
