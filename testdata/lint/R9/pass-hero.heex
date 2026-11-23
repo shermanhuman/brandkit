@@ -5,3 +5,5 @@
     <.input field={@form[:title]} name="hero-title" />
   </div>
 </div>
+<.input :if={@n < 3} name="hero-title" />
+<.button icon="lucide-trash">Delete</.button>

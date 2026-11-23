@@ -376,3 +376,25 @@ span, p { color: #eee; background: #fff; }
 		}
 	}
 }
+
+// TestBareHostIsNoRedirect: --url http://host (no path) lands on
+// http://host/, which isn't a redirect; neither is a fragment (F2-m2).
+func TestBareHostIsNoRedirect(t *testing.T) {
+	needChrome(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<!doctype html><html lang="en"><title>ok</title><main><p id="top">Fine.</p></main></html>`))
+	}))
+	defer srv.Close()
+	for _, u := range []string{srv.URL, srv.URL + "/#top"} {
+		rep, err := Run(context.Background(), Options{URL: u, Out: t.TempDir(), Widths: []int{375}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rep.FinalURL != "" {
+			t.Errorf("%s: reported a redirect to %s", u, rep.FinalURL)
+		}
+	}
+	if sameURL("http://h/a", "http://h/b") || !sameURL("http://h", "http://h/") {
+		t.Error("sameURL")
+	}
+}

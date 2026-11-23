@@ -429,7 +429,7 @@ func (l *linter) class(c string, off int) {
 		if strings.HasPrefix(val, "--") {
 			return // Tailwind's bg-[--x] shorthand for a variable
 		}
-		if rawColour(val) || colourKindRe.MatchString(kind) && namedColour(val) {
+		if rawColour(val) || colourKindRe.MatchString(kind) && namedColour(urlRe.ReplaceAllString(val, "url()")) {
 			l.add(off, "R1", "error", c, "arbitrary colour value; use a theme role (bg-primary, text-base-content) or a token")
 			return
 		}
@@ -537,17 +537,60 @@ func attrValue(data []byte, i int) (string, int) {
 
 var tagNameRe = regexp.MustCompile(`^<([\w.:-]+)`)
 
-// tagAt names the tag an attribute at off belongs to.
+// tagAt names the tag an attribute at off belongs to: the nearest tag
+// start before off whose attributes run up to off without closing. A < in
+// an earlier attribute ({@n < 3}) or template action (<%= … %>) isn't one.
 func tagAt(data []byte, off int) string {
-	i := bytes.LastIndexByte(data[:off], '<')
-	if i < 0 {
-		return ""
+	for end := off; ; {
+		i := bytes.LastIndexByte(data[:end], '<')
+		if i < 0 {
+			return ""
+		}
+		if m := tagNameRe.FindSubmatch(data[i:]); m != nil && openTag(data, i, off) {
+			return strings.ToLower(string(m[1]))
+		}
+		end = i
 	}
-	m := tagNameRe.FindSubmatch(data[i:])
-	if m == nil {
-		return ""
+}
+
+// openTag reports whether the tag starting at i is still open at off,
+// outside any quoted value, {…} expression or template action.
+func openTag(data []byte, i, off int) bool {
+	depth := 0
+	var quote byte
+	for j := i + 1; j < off; j++ {
+		c := data[j]
+		if bytes.HasPrefix(data[j:], []byte("<%")) || bytes.HasPrefix(data[j:], []byte("{{")) {
+			closer := []byte("}}")
+			if c == '<' {
+				closer = []byte("%>")
+			}
+			k := bytes.Index(data[j+2:off], closer)
+			if k < 0 {
+				return false
+			}
+			j += 2 + k + 1
+			continue
+		}
+		switch {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			}
+		case c == '"' || c == '\'':
+			quote = c
+		case c == '{':
+			depth++
+		case c == '}':
+			depth--
+			if depth < 0 {
+				return false
+			}
+		case c == '>' && depth == 0:
+			return false
+		}
 	}
-	return strings.ToLower(string(m[1]))
+	return depth == 0 && quote == 0
 }
 
 func blank(data []byte, re *regexp.Regexp) []byte {
@@ -594,7 +637,8 @@ func (l *linter) markup(data []byte, base int) {
 		case strings.Contains(name, "class"):
 			l.classList(val, voff, data[start] == '{')
 			l.icons(val, voff)
-		case (name == "name" || name == ":name") && strings.Contains(tagAt(data, m[2]), "icon"):
+		case (name == "name" || name == ":name") && strings.Contains(tagAt(data, m[2]), "icon"),
+			strings.Contains(name, "icon"): // <.button icon="hero-trash">
 			l.icons(val, voff)
 		}
 	}

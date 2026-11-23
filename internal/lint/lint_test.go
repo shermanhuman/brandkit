@@ -48,6 +48,9 @@ var want = map[string]int{
 	"R4/fail-named.html": 2,
 	// Heroicons in a class list; hero-* elsewhere is fine (R1-M7).
 	"R9/fail-class.heex": 1,
+	// An icon tag with a < inside an earlier attribute; an icon attribute
+	// other than name (F2-m3).
+	"R9/fail-attrs.heex": 2,
 }
 
 func TestRuleFixtures(t *testing.T) {

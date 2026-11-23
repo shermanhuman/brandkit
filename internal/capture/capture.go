@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -201,7 +202,7 @@ func Run(ctx context.Context, opts Options) (*Report, error) {
 	if rep.Status >= 400 {
 		return nil, fmt.Errorf("capture: %s answered %d %s, so there is no page to check", opts.URL, rep.Status, resp.StatusText)
 	}
-	if final, err := chromedp.Run(tab, chromedp.Location()); err == nil && final != opts.URL {
+	if final, err := chromedp.Run(tab, chromedp.Location()); err == nil && !sameURL(final, opts.URL) {
 		rep.FinalURL = final
 	}
 	if !opts.NoFreeze {
@@ -484,3 +485,21 @@ const probeJS = `(() => {
   }
   return { scrollWidth: doc.scrollWidth, innerWidth: iw, height: Math.ceil(Math.max(doc.scrollHeight, document.body ? document.body.scrollHeight : 0)), offenders, texts };
 })()`
+
+// sameURL compares two URLs as a browser lands on them: an empty path is
+// "/", and the fragment doesn't count. So http://host and http://host/ are
+// the same page, not a redirect.
+func sameURL(a, b string) bool {
+	norm := func(s string) string {
+		u, err := url.Parse(s)
+		if err != nil {
+			return s
+		}
+		u.Fragment, u.RawFragment = "", ""
+		if u.Path == "" && u.Opaque == "" {
+			u.Path = "/"
+		}
+		return u.String()
+	}
+	return norm(a) == norm(b)
+}
