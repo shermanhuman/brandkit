@@ -11,5 +11,5 @@ require (
 
 require (
 	github.com/go-json-experiment/json v0.0.0-20260213210345-44df1a37e875 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 )
