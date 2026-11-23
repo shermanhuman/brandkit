@@ -1,11 +1,11 @@
 # The screenshot review
 
-Read this at step 6 of the design skill, to brief the reviewer. The reviewer is a new subagent or process that never saw the build. A reviewer that inherits the build's transcript inherits its framing and tends to accept what it sees.
+Read this at step 6 of the design skill, to brief the reviewer. The reviewer is a new subagent or process that never saw the build, never a fork of the session that built it. A reviewer that inherits the build's transcript inherits its framing and tends to accept what it sees.
 
 ## What the reviewer gets
 
 - the user stories with their acceptance tests (step 1);
-- the picked mockup's captures and the user's note with the pick, if any;
+- the picked mockup's captures and the user's note with the pick, if any; for a small addition with no mockup, the existing screen's captures from before the change;
 - the built screen's captures: every theme, the worst case, the stress widths, and each `report.json`;
 - `brandkit lint` output for the changed files, including any ignores and their reasons;
 - the path to the brand package's `README.md` and its generated CSS;
@@ -27,7 +27,7 @@ A verdict, **ship** or **fix**, then findings in two groups:
 - **Must-fix:** a story that fails, a difference from the pick, a brand violation, a stress case that breaks.
 - **Polish:** the rest.
 
-Each finding gives the screenshot or file and line, what's wrong, and the fix. Post the report on the pull request with the captures it cites. After the fixes, a fresh reviewer checks only those fixes against the same inputs.
+Each finding gives the screenshot or file and line, what's wrong, and the fix.
 
 ---
 

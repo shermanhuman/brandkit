@@ -1,17 +1,17 @@
 ---
 name: brand
-description: Define or update a brand as a brandkit package - inventory the existing logos, token files, CSS and drafts, draft DTCG tokens with every conflict listed, settle the gaps with the user in one decision packet, build and check it, and get the generated README brand sheet approved. Use when a brand needs codifying, when its sources disagree, when a brand package needs changes, or when the design skill finds no package installed.
+description: Define or update a brand as a brandkit package (DTCG tokens, themes and checkable rules) with the user. Use when a brand needs codifying, when its logos, CSS or guides disagree, when a brand package needs changes, or when UI work needs a brand package and none exists yet. It inventories the sources, settles every conflict in one decision packet, and ends with an approved README brand sheet.
 ---
 
 # Brand
 
 Turn a brand into a brandkit package: DTCG 2025.10 token files, a resolver with one context per theme, and the brand's checkable rules, from which `brandkit build` writes the CSS, both DaisyUI theme forms, the lint config and a README brand sheet. The user decides what the brand is; you find, compare and propose. **Never invent a palette, a font or a logo.** Every value comes from an existing source or from the user's answer.
 
-Field names, the extension keys and every command flag are in [brandkit's README](https://github.com/shermanhuman/brandkit#a-brand-package). The fixture brands [`base`](https://github.com/shermanhuman/brandkit/tree/main/testdata/brands/base) and [`sub`](https://github.com/shermanhuman/brandkit/tree/main/testdata/brands/sub) (which extends `base`) are complete packages to copy the shape from. [references/package.md](references/package.md) covers the layout and the choices this skill makes within it.
+Package field names and the extension keys are in [brandkit's README](https://github.com/shermanhuman/brandkit#a-brand-package); for command flags use `brandkit help`, which always matches the installed binary. The fixture brands [`base`](https://github.com/shermanhuman/brandkit/tree/main/testdata/brands/base) and [`sub`](https://github.com/shermanhuman/brandkit/tree/main/testdata/brands/sub) (which extends `base`) are complete packages to copy the shape from. [references/package.md](references/package.md) covers the layout and the choices this skill makes within it.
 
 ## 0. Tool
 
-`brandkit version` must work. If it doesn't, install it with `mise use github:shermanhuman/brandkit`. `build` needs a browser for the README specimens: see the README's *Install* section, or pass `--no-images` while drafting.
+`brandkit version` must work. If it doesn't, install it with `mise use github:shermanhuman/brandkit`. `build` needs a browser for the README specimens (the README's *Install* section). `--no-images` only reuses specimens an earlier build wrote, so the first build of a package needs the browser.
 
 ## 1. Inventory every source
 
@@ -32,19 +32,20 @@ Then list the **gaps**: what the package needs and no source gives, such as a mi
 Work in the package's own folder or repository. Where it lives (a new repository, its name, public or private) is the user's call: if they haven't said, it goes in the packet.
 
 1. **`brandkit.json`**: name, description, `repo`, the resolver, the themes (one `default`), fonts and what `install` ships.
-2. **Tokens**, split as the fixtures split them: primitives (the raw palette, font families, scales), semantic roles that alias primitives, and one file per theme context. Colours are OKLCH with the source's displayed hex kept in the `hex` field, so a consumer that reads hex sees exactly what it saw before.
+2. **Tokens**, split as the fixtures split them: primitives (the raw palette, font families, scales), semantic roles that alias primitives, and one file per theme context. Colours are OKLCH with the source's displayed hex kept in the `hex` field, so a consumer that reads hex sees exactly what it saw before. Two sources whose hex values differ at all are a conflict, however close they look.
 3. **Resolver:** one set per layer and a `theme` modifier with one context per theme.
-4. **Extending another brand:** run `brandkit install owner/base@tag` in this package (the files land in `vendor/brand/<base>/`, pinned in `brandkit.lock`; the base's `install` list must include `tokens`) and list the vendored token files first in each resolver set and context. This brand's own files come after them and win. Override only what differs; never copy the base's values into this package. (The `sub` fixture refers to `vendor/fixture-base/` because it vendors by hand; an installed base is under `vendor/brand/`.)
+4. **Extending another brand:** run `brandkit install owner/base@tag` in this package (the files land in `vendor/brand/<base>/`, pinned in `brandkit.lock`; the base's `install` list must include `tokens`) and list the vendored token files first in each resolver set and context. This brand's own files come after them and win. Override only what differs; never copy the base's values into this package. Add `vendor` to this package's `install` list, so projects that install it also get the base's fonts and assets. (The `sub` fixture refers to `vendor/fixture-base/` because it vendors by hand; an installed base is under `vendor/brand/`.)
 5. **Rules** in the token files' root `$extensions` (the keys are in the README's *Token extensions*): the DaisyUI role mapping, contrast pairs with their minimum and use, the accent and the body-text tokens it may never be, shadows, the mark and lockup per theme, clear space, the icon set, the scales, do and don't.
-6. Fill each value from the source the conflict table favours. Set every value still open to the string `"TODO"`: `check` fails on it as a schema error, so nothing unsettled can ship.
+6. Fill each value from the source the conflict table favours. Set every value still open to the string `"TODO"`, the open-value marker: `check` fails on any `"TODO"`, so nothing unsettled can ship.
 
-Run `brandkit check` on the draft. Every failure it reports is either a conflict or a gap you already listed, or a new one to add.
+While the draft holds a `"TODO"`, `check` fails and `build` won't produce a sheet, so they can't check the rest of it. The previews in step 3 are how you check the rest.
 
 ## 3. One packet to the user
 
 Settle every conflict and gap in one round trip, as one decision packet: follow the host's rules for decision packets where it has them (for example an `interrogate` skill), otherwise a local HTML page outside the working tree, with answers in chat.
 
-- **Show, don't describe.** Colour conflicts as swatches side by side with each pairing's contrast ratio; type as a rendered specimen; logos as images in both themes. Run `brandkit build` on the draft and use its sheet images where they fit.
+- **Show, don't describe.** Colour conflicts as swatches side by side with each pairing's contrast ratio; type as a rendered specimen; logos as images in both themes.
+- **Previews come from candidate packages.** For each option of each decision, copy the draft to a scratch folder outside the working tree, fill that decision's open values with the option's values and every other open value with its recommendation, then run `brandkit check <dir>` and `brandkit build <dir>` there. Use that build's sheet images, take the ratios from its Contrast table, and put any `check` failure in that option's text. The real package is built only after the answers (step 4).
 - **Options from the sources first.** Each conflict's options are the values the sources hold. Where a gap has no source, you may propose values derived from what the brand already has (a content colour computed to pass 4.5:1 on an existing surface, a night surface from the day hue), labelled as proposals with how you derived them. A brand with no colours at all gets a question, not a proposed palette.
 - **Recommend one option** for each, with the reason in one line (most-used copy, the newest source, the only one that passes contrast). Every decision ends with More discussion.
 - **Critical first:** the repository's home and visibility, the logo master, anything that changes what existing products show. Then the rest, each with your default.
@@ -63,7 +64,7 @@ brandkit build        # writes export/ and README.md; commit both
 brandkit check        # schema, contrast of every declared pair, brand rules
 ```
 
-Repeat until `check` exits 0. A contrast failure is fixed by moving the failing colour along its own hue in OKLCH, or by pairing it with a different content colour. If the fix visibly changes a colour the user chose, show them the before and after and ask; don't ship a silent change to their answer.
+Step 4 is done when every row of the conflict and gap list has a recorded answer, no `"TODO"` is left, and `check` reports no errors. `check` exits 0 with warnings (no lockup, no icon set, a font the package doesn't ship), so read them: each is either fixed or a gap with a recorded answer. A contrast failure is fixed by moving the failing colour along its own hue in OKLCH, or by pairing it with a different content colour. If the fix visibly changes a colour the user chose, show them the before and after and ask; don't ship a silent change to their answer.
 
 If the package replaces an older token file that projects still read, generate that file too (`tokensCss.template` reproduces a legacy layout byte for byte) and diff it against the old one. Any difference is a change those projects will see: list it.
 

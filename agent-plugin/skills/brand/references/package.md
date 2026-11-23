@@ -15,7 +15,7 @@ fonts/                        WOFF2 files, @font-face CSS and each licence
 export/, README.md            written by brandkit build; commit them, never edit by hand
 ```
 
-Put `tokens`, `fonts` and `assets` in `install` when other brands will extend this one or projects need the fonts and logos.
+Put `tokens`, `fonts` and `assets` in `install` when other brands will extend this one or projects need the fonts and logos. A brand that extends another also lists `vendor`, which holds the installed base.
 
 ## Naming
 
@@ -25,7 +25,6 @@ Put `tokens`, `fonts` and `assets` in `install` when other brands will extend th
 
 ## Values
 
-- Colours: OKLCH, with `hex` holding the value the source displayed. Two sources whose hex values differ at all are a conflict, however close they look.
 - Type: one family per role (body, display, mono) and the scale largest first. Sizes in rem.
 - Spacing and radius: a short scale (five to eight steps) taken from what the sources actually use; collect the values from their CSS rather than inventing a progression.
 - Contrast pairs: declare every text-on-surface pair the UI uses, each with its minimum (4.5 for body text, 3 for large text and UI parts) and a one-line use. `check` only checks what is declared.
@@ -36,7 +35,7 @@ Keep it in the working notes and the packet, in this shape:
 
 | # | What | Source A | Source B | Recommended | Why |
 |---|---|---|---|---|---|
-| 1 | `accent` (dark) | guide `#7c3aed` | admin CSS `#8b5cf6` | guide | the spec; admin drifted in a copy |
+| 1 | `accent` (night) | guide `#7c3aed` | admin CSS `#8b5cf6` | guide | the spec; admin drifted in a copy |
 | 2 | night `warning` | none | none | proposal: `oklch(0.80 0.15 75)` | derived from the day hue to pass 4.5:1 on `base-100` |
 
 A gap's "source" columns say `none`; its recommendation is labelled a proposal.

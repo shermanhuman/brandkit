@@ -5,7 +5,7 @@ Defaults that make a screen read as generated rather than designed. Check each m
 | Look | What it is | Why it hurts |
 |---|---|---|
 | The SaaS card kit | every item in an identical rounded card with a soft drop shadow, often on a gradient wash | it hides which item matters; cards inside cards waste space on mobile |
-| Template chrome | ALL-CAPS eyebrow labels over headings, `A · B · C` meta strings, `→` on every button, monospace for labels that aren't code | decoration that encodes nothing, and the same on every generated page |
+| Template chrome | ALL-CAPS eyebrow labels over headings, italic accent words inside headlines, `A · B · C` meta strings, `→` on every button, monospace for labels that aren't code | decoration that encodes nothing, and the same on every generated page |
 | Fake sequence | `01 / 02 / 03` numbering on items that aren't steps | numbering promises an order the content doesn't have |
 | Stat hero | a big number with three small stats as the page opener | it fits only screens whose job is that number |
 | Pills everywhere | every button and badge fully rounded | pill buttons and pill badges stop being distinguishable; use the brand's radius scale |
