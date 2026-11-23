@@ -114,28 +114,32 @@ func TestInstallUpdateVerify(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if _, ok := e.Files["README.md"]; ok {
-		t.Error("the README isn't part of an install")
+	// The brand sheet comes too: the README and its images.
+	for _, f := range []string{"README.md", "export/sheet/sw-00696f.svg", "export/sheet/type-day.png"} {
+		if _, ok := e.Files[f]; !ok {
+			t.Errorf("brand sheet not vendored: %s", f)
+		}
 	}
 	l, err := ReadLock(project)
 	if err != nil || len(l.Brands) != 1 || l.Brands[0].Commit != "aaaa1111" || l.Brands[0].Lint != "vendor/brand/fixture-base-brand/export/lint.json" {
 		t.Fatalf("lock %+v %v", l, err)
 	}
-	if err := Verify(project); err != nil {
-		t.Fatal(err)
+	if n, err := Verify(project); err != nil || n != 1 {
+		t.Fatal(n, err)
 	}
 
-	// Edited vendored files are caught.
+	// Edited and missing vendored files are caught.
 	tp := filepath.Join(project, "vendor", "brand", "fixture-base-brand", "export", "ui", "tokens.css")
 	os.WriteFile(tp, []byte("tampered"), 0o644)
-	if err := Verify(project); err == nil || !strings.Contains(err.Error(), "export/ui/tokens.css was edited") {
+	os.Remove(filepath.Join(project, "vendor", "brand", "fixture-base-brand", "README.md"))
+	if _, err := Verify(project); err == nil || !strings.Contains(err.Error(), "export/ui/tokens.css was edited") || !strings.Contains(err.Error(), "README.md is missing") {
 		t.Fatalf("Verify: %v", err)
 	}
 	// Reinstalling from the lock restores them.
 	if _, err := c.Install(project, e.Repo, e.Tag, "vendor/brand", &l.Brands[0]); err != nil {
 		t.Fatal(err)
 	}
-	if err := Verify(project); err != nil {
+	if _, err := Verify(project); err != nil {
 		t.Fatal(err)
 	}
 
@@ -184,5 +188,92 @@ func TestParseRef(t *testing.T) {
 		if _, _, err := ParseRef(bad); err == nil {
 			t.Errorf("%s accepted", bad)
 		}
+	}
+}
+
+// TestInstallRefusesPathsLeavingThePackage: a package's brandkit.json can't
+// point install at files outside the package (R1-M1).
+func TestInstallRefusesPathsLeavingThePackage(t *testing.T) {
+	pkg := filepath.Join("..", "..", "testdata", "brands", "base")
+	secretDir := t.TempDir()
+	os.WriteFile(filepath.Join(secretDir, "secret.txt"), []byte("key"), 0o644)
+	for key, val := range map[string]any{
+		"lint":      "../../../../../../../../../../.." + filepath.ToSlash(secretDir) + "/secret.txt",
+		"readme":    map[string]any{"file": "../outside.md"},
+		"install":   []any{"../"},
+		"tokensCss": map[string]any{"file": "../../x.css"},
+	} {
+		field := key
+		fake := &fakeGitHub{
+			tags: map[string]string{"v1": "aaaa1111"},
+			tarballs: map[string][]byte{"aaaa1111": tarball(t, pkg, "top", func(rel string, d []byte) []byte {
+				if rel != "brandkit.json" {
+					return d
+				}
+				var m map[string]any
+				if err := json.Unmarshal(d, &m); err != nil {
+					t.Fatal(err)
+				}
+				m[key] = val
+				out, _ := json.Marshal(m)
+				return out
+			})},
+		}
+		srv := httptest.NewServer(fake)
+		c := &Client{API: srv.URL, HTTP: srv.Client()}
+		project := t.TempDir()
+		_, err := c.Install(project, "example/fixture-base-brand", "v1", "", nil)
+		srv.Close()
+		if err == nil || !strings.Contains(err.Error(), "leaves its folder") {
+			t.Errorf("%s: %v", field, err)
+		}
+		if _, err := os.Stat(filepath.Join(project, LockFile)); err == nil {
+			t.Errorf("%s: a lock was written", field)
+		}
+	}
+}
+
+// TestLockPathsChecked: a lock whose dir, lint or files leave the project
+// is refused before anything reads or removes it (R1-M1).
+func TestLockPathsChecked(t *testing.T) {
+	for _, entry := range []string{
+		`{"repo":"a/b","tag":"v1","commit":"c","dir":"../../home","lint":"x/lint.json","files":{}}`,
+		`{"repo":"a/b","tag":"v1","commit":"c","dir":"/","lint":"x/lint.json","files":{}}`,
+		`{"repo":"a/b","tag":"v1","commit":"c","dir":"vendor/brand/b","lint":"../../.ssh/id_rsa","files":{}}`,
+		`{"repo":"a/b","tag":"v1","commit":"c","dir":"vendor/brand/b","lint":"x","files":{"../../x":"00"}}`,
+		`{"repo":"../x","tag":"v1","commit":"c","dir":"vendor/brand/b","lint":"x","files":{}}`,
+	} {
+		project := t.TempDir()
+		os.WriteFile(filepath.Join(project, LockFile), []byte(`{"version":1,"brands":[`+entry+`]}`), 0o644)
+		if _, err := ReadLock(project); err == nil {
+			t.Errorf("accepted %s", entry)
+		}
+	}
+	if _, err := (&Client{}).Install(t.TempDir(), "a/b", "v1", "../up", nil); err == nil || !strings.Contains(err.Error(), "leaves its folder") {
+		t.Errorf("--dir ../up: %v", err)
+	}
+}
+
+func TestUntarLimits(t *testing.T) {
+	pack := func(sizes ...int) *bytes.Buffer {
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		tw := tar.NewWriter(gz)
+		for i, n := range sizes {
+			tw.WriteHeader(&tar.Header{Name: "top/f" + string(rune('a'+i)), Mode: 0o644, Size: int64(n), Typeflag: tar.TypeReg})
+			tw.Write(bytes.Repeat([]byte("x"), n))
+		}
+		tw.Close()
+		gz.Close()
+		return &buf
+	}
+	if err := untarLimits(pack(10, 10), t.TempDir(), 10, 100); err != nil {
+		t.Fatal(err)
+	}
+	if err := untarLimits(pack(11), t.TempDir(), 10, 100); err == nil {
+		t.Error("a file over the limit was cut short without an error")
+	}
+	if err := untarLimits(pack(10, 10, 10), t.TempDir(), 10, 25); err == nil {
+		t.Error("no total size cap")
 	}
 }

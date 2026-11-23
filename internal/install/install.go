@@ -167,8 +167,19 @@ func (c *Client) fetch(repo, commit string) (string, error) {
 	return dir, nil
 }
 
+// Size limits for a brand archive.
+const (
+	maxFileSize  = 200 << 20
+	maxTotalSize = 1 << 30
+)
+
 // untar extracts regular files, dropping the archive's top folder.
 func untar(r io.Reader, dir string) error {
+	return untarLimits(r, dir, maxFileSize, maxTotalSize)
+}
+
+func untarLimits(r io.Reader, dir string, maxFile, maxTotal int64) error {
+	var total int64
 	gz, err := gzip.NewReader(r)
 	if err != nil {
 		return err
@@ -205,7 +216,14 @@ func untar(r io.Reader, dir string) error {
 		if err != nil {
 			return err
 		}
-		if _, err := io.Copy(f, io.LimitReader(tr, 200<<20)); err != nil {
+		n, err := io.Copy(f, io.LimitReader(tr, maxFile+1))
+		if err == nil && n > maxFile {
+			err = fmt.Errorf("%s in the archive is over %d MiB", name, maxFile>>20)
+		}
+		if total += n; err == nil && total > maxTotal {
+			err = fmt.Errorf("the archive holds over %d MiB", maxTotal>>20)
+		}
+		if err != nil {
 			f.Close()
 			return err
 		}
@@ -215,8 +233,20 @@ func untar(r io.Reader, dir string) error {
 	}
 }
 
+// SafeRel cleans a slash-separated relative path and rejects one that is
+// absolute or leaves its folder. Every path that comes from a package's
+// brandkit.json or from brandkit.lock goes through it.
+func SafeRel(p string) (string, error) {
+	c := path.Clean(strings.ReplaceAll(p, `\`, "/"))
+	if p == "" || c == "." || c == ".." || strings.HasPrefix(c, "../") || path.IsAbs(c) || filepath.IsAbs(p) || filepath.VolumeName(p) != "" {
+		return "", fmt.Errorf("path %q is absolute or leaves its folder", p)
+	}
+	return c, nil
+}
+
 // Files lists what a brand package ships: brandkit.json, the generated
-// outputs, and its install list (folders whole), sorted.
+// outputs, the README brand sheet and its images, and its install list
+// (folders whole), sorted.
 func Files(pkgDir string) ([]string, *brand.Config, error) {
 	b, err := brand.Load(pkgDir)
 	if err != nil {
@@ -224,16 +254,27 @@ func Files(pkgDir string) ([]string, *brand.Config, error) {
 	}
 	c := b.Config
 	set := map[string]bool{brand.ConfigFile: true}
+	var files, folders []string
 	for _, f := range []string{c.TokensCSS.File, c.BrandCSS.File, c.DaisyUI.ThemesCSS, c.DaisyUI.PluginCSS, c.Lint} {
-		set[path.Join(c.Out, f)] = true
+		files = append(files, path.Join(c.Out, f))
 	}
-	for _, inc := range c.Install {
-		inc = path.Clean(inc)
-		if strings.HasPrefix(inc, "..") || path.IsAbs(inc) {
-			return nil, nil, fmt.Errorf("install entry %q leaves the package", inc)
+	files = append(files, c.Readme.File)
+	folders = append(folders, c.Readme.Assets)
+	folders = append(folders, c.Install...)
+	for _, f := range files {
+		rel, err := SafeRel(f)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", brand.ConfigFile, err)
 		}
-		root := filepath.Join(pkgDir, filepath.FromSlash(inc))
-		err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		set[rel] = true
+	}
+	for _, inc := range folders {
+		rel, err := SafeRel(inc)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%s: install entry: %w", brand.ConfigFile, err)
+		}
+		root := filepath.Join(pkgDir, filepath.FromSlash(rel))
+		err = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -249,13 +290,35 @@ func Files(pkgDir string) ([]string, *brand.Config, error) {
 	}
 	var out []string
 	for f := range set {
-		if _, err := os.Stat(filepath.Join(pkgDir, filepath.FromSlash(f))); err != nil {
+		if st, err := os.Lstat(filepath.Join(pkgDir, filepath.FromSlash(f))); err != nil || !st.Mode().IsRegular() {
 			return nil, nil, fmt.Errorf("%s is missing from the package (was it built and committed?)", f)
 		}
 		out = append(out, f)
 	}
 	sort.Strings(out)
 	return out, &c, nil
+}
+
+// checkEntry rejects a lock entry whose paths are absolute or leave the
+// project, or whose repo isn't owner/name.
+func checkEntry(e *Entry) error {
+	if _, _, err := ParseRef(e.Repo); err != nil {
+		return fmt.Errorf("%s: repo %w", LockFile, err)
+	}
+	if _, err := SafeRel(e.Dir); err != nil {
+		return fmt.Errorf("%s: %s: dir: %w", LockFile, e.Repo, err)
+	}
+	if e.Lint != "" {
+		if _, err := SafeRel(e.Lint); err != nil {
+			return fmt.Errorf("%s: %s: lint: %w", LockFile, e.Repo, err)
+		}
+	}
+	for f := range e.Files {
+		if _, err := SafeRel(f); err != nil {
+			return fmt.Errorf("%s: %s: files: %w", LockFile, e.Repo, err)
+		}
+	}
+	return nil
 }
 
 // ReadLock reads brandkit.lock from a project (an empty lock if none).
@@ -270,6 +333,11 @@ func ReadLock(project string) (*Lock, error) {
 	var l Lock
 	if err := json.Unmarshal(data, &l); err != nil {
 		return nil, fmt.Errorf("%s: %w", LockFile, err)
+	}
+	for i := range l.Brands {
+		if err := checkEntry(&l.Brands[i]); err != nil {
+			return nil, err
+		}
 	}
 	return &l, nil
 }
@@ -290,6 +358,13 @@ func (c *Client) Install(project, repo, tag, dir string, verify *Entry) (*Entry,
 	if dir == "" {
 		dir = DefaultDir
 	}
+	if _, _, err := ParseRef(repo); err != nil {
+		return nil, err
+	}
+	dir, err := SafeRel(filepath.ToSlash(dir))
+	if err != nil {
+		return nil, fmt.Errorf("--dir: %w", err)
+	}
 	commit, err := c.Commit(repo, tag)
 	if err != nil {
 		return nil, err
@@ -307,7 +382,7 @@ func (c *Client) Install(project, repo, tag, dir string, verify *Entry) (*Entry,
 		return nil, fmt.Errorf("%s@%s: %w", repo, tag, err)
 	}
 	name := repo[strings.Index(repo, "/")+1:]
-	dest := path.Join(filepath.ToSlash(dir), name)
+	dest := path.Join(dir, name)
 	e := &Entry{Repo: repo, Tag: tag, Commit: commit, Dir: dest, Lint: path.Join(dest, cfg.Out, cfg.Lint), Files: map[string]string{}}
 	destAbs := filepath.Join(project, filepath.FromSlash(dest))
 	if err := os.RemoveAll(destAbs); err != nil {
@@ -345,11 +420,13 @@ func (c *Client) Install(project, repo, tag, dir string, verify *Entry) (*Entry,
 	return e, writeLock(project, l)
 }
 
-// Verify checks the vendored files against the lock without the network.
-func Verify(project string) error {
+// Verify checks the vendored files against the lock without the network
+// (brandkit install --check). It returns the brands checked, and an error
+// listing every file that is missing or was edited.
+func Verify(project string) (int, error) {
 	l, err := ReadLock(project)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	var problems []string
 	for _, e := range l.Brands {
@@ -367,10 +444,15 @@ func Verify(project string) error {
 	}
 	sort.Strings(problems)
 	if len(problems) > 0 {
-		return errors.New(strings.Join(problems, "\n"))
+		return len(l.Brands), &VerifyError{Problems: problems}
 	}
-	return nil
+	return len(l.Brands), nil
 }
+
+// VerifyError lists the vendored files that don't match the lock.
+type VerifyError struct{ Problems []string }
+
+func (e *VerifyError) Error() string { return strings.Join(e.Problems, "\n") }
 
 func short(s string) string {
 	if len(s) > 12 {
