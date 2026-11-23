@@ -12,8 +12,8 @@ Design inside the brand, never around it. The tokens, themes and rules come from
 ## 0. Scope
 
 - **A new screen or page, or a redesign:** the whole process below.
-- **A small addition inside an existing screen** (a field, a state, a dialog): it inherits that screen, so there are no mockups and no pick. Do steps 1 and 2, build the change, then run step 6's checks and review, with the existing screen's captures standing in for the picked mockup.
-- **Several screens:** group them by pattern (app shell, list and detail, settings and forms) and make one pick per pattern, not one per screen. All of a goal's picks go to the user together as one decision group, unless a later pattern depends on an earlier answer.
+- **A small addition inside an existing screen** (a field, a state, a dialog): it inherits that screen, so there are no mockups and no pick. Do steps 1 and 2, then capture the existing screen in each theme before you change anything. Build the change, then run step 6's checks and review, with those before captures standing in for the picked mockup.
+- **Several screens:** group them by pattern (app shell, list and detail, settings and forms) and make one pick per pattern, not one per screen; [references/pick.md](references/pick.md) says how they go out.
 
 ## 1. Intent and stories
 
@@ -58,9 +58,9 @@ Build each as working code in the project's real stack and templates, with the r
 
 Use the short lists while building: [references/avoid.md](references/avoid.md) (looks to avoid), [references/copy.md](references/copy.md) (interface copy), [references/motion.md](references/motion.md) (motion).
 
-## 4. Capture and lint each, until clean
+## 4. Capture and lint each
 
-For each mockup, before the user sees any of them, run from the project root:
+For each mockup, before the user sees any of them, run these from the project root until it's clean or has had three fix rounds:
 
 ```sh
 brandkit lint <the mockup's templates and CSS> [--compiled <built css>]
@@ -83,7 +83,7 @@ Then look at the screenshots yourself (`w1280.png`, `w375.png` and the worst-cas
 
 ## 5. The pick
 
-Put the three in front of the user as one decision, laid out as [references/pick.md](references/pick.md) describes, where the host's rules send questions for the user. The mockups are shown as captures, or in a frame sandboxed with `allow-scripts` only; never as live code on the page itself.
+Put the three in front of the user as one decision, laid out and posted as [references/pick.md](references/pick.md) describes.
 
 The build waits for the answer: it's a taste call, so it never defaults to your pick while a user can be asked. Carry on with other work meanwhile.
 
@@ -95,7 +95,7 @@ The build waits for the answer: it's a taste call, so it never defaults to your 
 
 ## 6. Build and review
 
-**Build the pick** into production code following the project's conventions (file layout, naming, components, the brand's classes and variables), then delete the mockup surface. The brand's edit hook warns about raw values as you go; fix each warning before moving on. Finish with step 4's checks on the real screen, plus:
+**Build the pick** into production code following the project's conventions (file layout, naming, components, the brand's classes and variables), then delete the mockup surface. The brand's edit hook warns about raw values as you go; fix each warning before moving on. Finish with step 4's checks on the real screen (lint the changed files), plus:
 
 - for a signed-in screen, `brandkit capture --cdp <ws url> --match <path>`, attached to the browser the project's e2e script drives;
 - the project's own tests.

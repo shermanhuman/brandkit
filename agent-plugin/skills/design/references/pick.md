@@ -18,6 +18,6 @@ Read this at step 5 of the design skill. The pick goes where the host's rules se
 
 **Never put a mockup's live code on the page unsandboxed.** Code served from the same origin as the answer form could post answers itself. When the interaction is the point, use `<iframe sandbox="allow-scripts">` (no `allow-same-origin`); captures stay the default.
 
-Several picks for one goal (one per pattern) go out together as one group, so the user answers them in one sitting.
+Several picks for one goal (one per pattern) go out together as one group, so the user answers them in one sitting, unless a later pattern depends on an earlier answer.
 
 If the answer doesn't come back through the page, ask for a reply in chat: `B`, `B: <note>`, or `more: <what's missing>`.
