@@ -12,38 +12,5 @@
   "shadows": "none",
   "iconSet": "lucide",
   "iconPrefix": "lucide-",
-  "opacityMin": 70,
-  "radius": [
-    "0.25rem",
-    "0.375rem",
-    "0.75rem"
-  ],
-  "colors": [
-    "#00696f",
-    "#091018",
-    "#0f1923",
-    "#10602d",
-    "#192532",
-    "#29559f",
-    "#313f4d",
-    "#60dbd4",
-    "#657383",
-    "#7e4f04",
-    "#7fe196",
-    "#9dc9f7",
-    "#aeb9c4",
-    "#b32228",
-    "#b63325",
-    "#ebeff4",
-    "#f8fafd",
-    "#fcd76f",
-    "#fe8a88",
-    "#ff987e"
-  ],
-  "generated": [
-    "tokens.css",
-    "brand.css",
-    "daisyui-themes.css",
-    "daisyui-plugin.css"
-  ]
+  "opacityMin": 70
 }

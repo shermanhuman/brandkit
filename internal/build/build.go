@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -24,8 +25,6 @@ type Options struct {
 	// Without it the PNGs already on disk are kept (and must exist).
 	Images bool
 	Chrome string
-	// ColorFormat is "hex" (default) or "oklch" for the DaisyUI themes.
-	ThemeColorFormat string
 }
 
 // File is one generated file.
@@ -94,6 +93,27 @@ func Write(b *brand.Brand, opts Options) ([]string, error) {
 		}
 	}
 	var written []string
+	keep := map[string]bool{}
+	for _, p := range ImagePaths(b) {
+		keep[p] = true
+	}
+	for _, f := range files {
+		keep[f.Path] = true
+	}
+	// Drop sheet files brandkit wrote earlier and no longer makes, such as
+	// the swatch of a colour that changed.
+	sheetDir := filepath.Join(b.Dir, filepath.FromSlash(b.Config.Readme.Assets))
+	if entries, err := os.ReadDir(sheetDir); err == nil {
+		for _, e := range entries {
+			rel := pathJoin(b.Config.Readme.Assets, e.Name())
+			if e.Type().IsRegular() && sheetNameRe.MatchString(e.Name()) && !keep[rel] {
+				if err := os.Remove(filepath.Join(sheetDir, e.Name())); err != nil {
+					return nil, err
+				}
+				written = append(written, rel+" (removed)")
+			}
+		}
+	}
 	for _, f := range files {
 		p := filepath.Join(b.Dir, filepath.FromSlash(f.Path))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -109,6 +129,9 @@ func Write(b *brand.Brand, opts Options) ([]string, error) {
 	}
 	return written, nil
 }
+
+// sheetNameRe matches the names brandkit gives sheet files.
+var sheetNameRe = regexp.MustCompile(`^(?:sw-[0-9a-f]{6,8}\.svg|(?:clearspace|scale)-[\w-]+\.svg|(?:type|components)-[\w-]+\.png)$`)
 
 func pathJoin(a, b string) string {
 	if a == "" || a == "." {
@@ -471,7 +494,6 @@ func LintConfig(b *brand.Brand) ([]byte, error) {
 		l.IconSet, l.IconName = rules.Icons.Set, rules.Icons.Prefix
 	}
 	fonts := map[string]bool{}
-	colors := map[string]bool{}
 	for _, th := range b.Themes {
 		for _, t := range th.Tokens.List {
 			switch t.Type {
@@ -483,12 +505,6 @@ func LintConfig(b *brand.Brand) ([]byte, error) {
 				for _, f := range brand.FontFamilies(t.Value.(*dtcg.Object).Values["fontFamily"]) {
 					fonts[f] = true
 				}
-			case "color":
-				s, err := brand.ColorCSS(t.Value, "hex")
-				if err != nil {
-					return nil, err
-				}
-				colors[s] = true
 			}
 		}
 	}
@@ -496,21 +512,6 @@ func LintConfig(b *brand.Brand) ([]byte, error) {
 		l.Fonts = append(l.Fonts, f)
 	}
 	sort.Strings(l.Fonts)
-	for c := range colors {
-		l.Colors = append(l.Colors, c)
-	}
-	sort.Strings(l.Colors)
-	for _, name := range rules.Radius {
-		if t := b.Default().Tokens.Get(name); t != nil {
-			ds, err := brand.Decls(t, "hex")
-			if err == nil {
-				l.Radius = append(l.Radius, ds[0].Value)
-			}
-		}
-	}
-	for _, f := range []string{b.Config.TokensCSS.File, b.Config.BrandCSS.File, b.Config.DaisyUI.ThemesCSS, b.Config.DaisyUI.PluginCSS} {
-		l.Generated = append(l.Generated, filepath.Base(f))
-	}
 	out, err := json.MarshalIndent(l, "", "  ")
 	if err != nil {
 		return nil, err

@@ -1,0 +1,8 @@
+.a {
+  color: currentColor;
+  background: transparent url(red.png);
+  border: 1px solid var(--red, currentcolor);
+  outline: none;
+  content: "red";
+  transition: color 0.2s, background-color 0.2s;
+}

@@ -1,0 +1,16 @@
+@theme {
+  --color-mine: #ff00ff;
+}
+@theme inline {
+  --color-other: oklch(0.6 0.2 300);
+}
+@utility glow {
+  color: #00ff00;
+  &:hover {
+    background-color: rgb(1 2 3);
+  }
+}
+@plugin "../vendor/daisyui-theme" {
+  name: "mine";
+  --color-primary: #ff0000;
+}
