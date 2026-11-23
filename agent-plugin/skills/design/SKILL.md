@@ -12,7 +12,7 @@ Design inside the brand, never around it. The tokens, themes and rules come from
 ## 0. Scope
 
 - **A new screen or page, or a redesign:** the whole process below.
-- **A small addition inside an existing screen** (a field, a state, a dialog): it inherits that screen, so there are no mockups and no pick. Do steps 1 and 2, then capture the existing screen in each theme before you change anything. Build the change, then run step 6's checks and review, with those before captures standing in for the picked mockup.
+- **A small addition inside an existing screen** (a field, a state, a dialog): it inherits that screen, so there are no mockups and no pick. Do steps 1 and 2, then capture the existing screen in each theme to `<captures>/before/<name>` (with `--cdp` for a signed-in screen) before you change anything. Build the change, then run step 6's checks and review, with those before captures standing in for the picked mockup.
 - **Several screens:** group them by pattern (app shell, list and detail, settings and forms) and make one pick per pattern, not one per screen; [references/pick.md](references/pick.md) says how they go out.
 
 ## 1. Intent and stories
@@ -60,7 +60,7 @@ Use the short lists while building: [references/avoid.md](references/avoid.md) (
 
 ## 4. Capture and lint each
 
-For each mockup, before the user sees any of them, run these from the project root until it's clean or has had three fix rounds:
+For each mockup, before the user sees any of them, run these from the project root:
 
 ```sh
 brandkit lint <the mockup's templates and CSS> [--compiled <built css>]
