@@ -1,0 +1,192 @@
+{
+  "url": "http://fixture/",
+  "axe": "axe-core 4.14.1",
+  "browser": "HeadlessChrome/158.0.8127.36",
+  "widths": [
+    {
+      "width": 375,
+      "screenshot": "w375.png",
+      "sha256": "8d0d75a32d8f5f99977719c6dfde3a3634c760434a80a25c024847a9e46ad265",
+      "pageHeight": 900,
+      "overflow": {
+        "scrollWidth": 624,
+        "overflows": true,
+        "offenders": [
+          {
+            "selector": "body > main:nth-of-type(1) > div:nth-of-type(1)",
+            "right": 624
+          }
+        ]
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "targets": [
+            ".faint"
+          ]
+        },
+        {
+          "id": "image-alt",
+          "impact": "critical",
+          "help": "Images must have alternative text",
+          "targets": [
+            "img"
+          ]
+        }
+      ],
+      "contrast": {
+        "checked": 8,
+        "skipped": 0,
+        "failures": [
+          {
+            "selector": "body > main:nth-of-type(1) > p:nth-of-type(2)",
+            "text": "Last synced a minute ago",
+            "fg": "#aeb9c4",
+            "bg": "#f8fafd",
+            "ratio": 1.9,
+            "min": 4.5
+          }
+        ]
+      }
+    },
+    {
+      "width": 768,
+      "screenshot": "w768.png",
+      "sha256": "4e6c01abfeea0abc4a16656a6684ab8d4690f7be1f7672b813b5a04b3926e035",
+      "pageHeight": 900,
+      "overflow": {
+        "scrollWidth": 768,
+        "overflows": false,
+        "offenders": []
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "targets": [
+            ".faint"
+          ]
+        },
+        {
+          "id": "image-alt",
+          "impact": "critical",
+          "help": "Images must have alternative text",
+          "targets": [
+            "img"
+          ]
+        }
+      ],
+      "contrast": {
+        "checked": 8,
+        "skipped": 0,
+        "failures": [
+          {
+            "selector": "body > main:nth-of-type(1) > p:nth-of-type(2)",
+            "text": "Last synced a minute ago",
+            "fg": "#aeb9c4",
+            "bg": "#f8fafd",
+            "ratio": 1.9,
+            "min": 4.5
+          }
+        ]
+      }
+    },
+    {
+      "width": 1280,
+      "screenshot": "w1280.png",
+      "sha256": "bae6a37b59cbd8790e79a06e29aaa20440bb4a1835d7dfb1e69f73bbed45603f",
+      "pageHeight": 900,
+      "overflow": {
+        "scrollWidth": 1280,
+        "overflows": false,
+        "offenders": []
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "targets": [
+            ".faint"
+          ]
+        },
+        {
+          "id": "image-alt",
+          "impact": "critical",
+          "help": "Images must have alternative text",
+          "targets": [
+            "img"
+          ]
+        }
+      ],
+      "contrast": {
+        "checked": 8,
+        "skipped": 0,
+        "failures": [
+          {
+            "selector": "body > main:nth-of-type(1) > p:nth-of-type(2)",
+            "text": "Last synced a minute ago",
+            "fg": "#aeb9c4",
+            "bg": "#f8fafd",
+            "ratio": 1.9,
+            "min": 4.5
+          }
+        ]
+      }
+    },
+    {
+      "width": 1920,
+      "screenshot": "w1920.png",
+      "sha256": "4d7f32ec3d6e5d17aa778670897319bf69a3cea2be234db135a85bb27695beb0",
+      "pageHeight": 900,
+      "overflow": {
+        "scrollWidth": 1920,
+        "overflows": false,
+        "offenders": []
+      },
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "targets": [
+            ".faint"
+          ]
+        },
+        {
+          "id": "image-alt",
+          "impact": "critical",
+          "help": "Images must have alternative text",
+          "targets": [
+            "img"
+          ]
+        }
+      ],
+      "contrast": {
+        "checked": 8,
+        "skipped": 0,
+        "failures": [
+          {
+            "selector": "body > main:nth-of-type(1) > p:nth-of-type(2)",
+            "text": "Last synced a minute ago",
+            "fg": "#aeb9c4",
+            "bg": "#f8fafd",
+            "ratio": 1.9,
+            "min": 4.5
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "axeSeriousCritical": 8,
+    "axeOther": 0,
+    "contrastFailures": 4,
+    "overflowWidths": [
+      375
+    ]
+  }
+}

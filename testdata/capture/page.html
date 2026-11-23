@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capture fixture</title>
+<style>
+  @font-face { font-family: "Atkinson Hyperlegible"; font-weight: 400; src: url("/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Atkinson Hyperlegible"; font-weight: 700; src: url("/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2"); }
+  body { margin: 0; font-family: "Atkinson Hyperlegible", sans-serif; background: #f8fafd; color: #091018; }
+  header { background: #091018; color: #f8fafd; padding: 16px 24px; }
+  main { padding: 24px; }
+  .faint { color: #aeb9c4; }
+  .wide { width: 600px; height: 40px; background: #00696f; color: #f8fafd; }
+  .card { border: 1px solid #aeb9c4; border-radius: 12px; padding: 16px; max-width: 480px; }
+  @keyframes pulse { from { opacity: 1; } to { opacity: 0.2; } }
+  .pulse { animation: pulse 1s infinite alternate; }
+  @media (min-width: 700px) { .wide { width: 100%; } }
+</style>
+</head>
+<body>
+<header><strong>Fixture app</strong></header>
+<main>
+  <h1>Invoices</h1>
+  <p>Three invoices are due this week.</p>
+  <p class="faint">Last synced a minute ago</p>
+  <div class="wide">This bar is too wide for a phone.</div>
+  <div class="card"><h2>November</h2><p>Paid in full.</p><img src="/chart.png" width="32" height="32"></div>
+  <p class="pulse">Saving…</p>
+</main>
+</body>
+</html>
