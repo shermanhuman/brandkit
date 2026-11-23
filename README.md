@@ -116,7 +116,11 @@ With `--cdp`, brandkit attaches to a running browser, such as one a Playwright e
 
 ## Agent plugin
 
-`agent-plugin/` is a Claude Code plugin with one hook. After an Edit or Write to a file lint reads, it runs `brandkit lint --hook` and passes the findings back to the agent as context. It only warns; CI is where lint fails. If brandkit isn't installed, the hook exits 0 and does nothing.
+`agent-plugin/` is a Claude Code plugin with two skills and one hook.
+
+- **`brand`** ([SKILL.md](agent-plugin/skills/brand/SKILL.md)) defines or updates a brand package. It inventories the existing logos, token files, CSS and drafts, drafts the DTCG package with every conflict listed, settles the gaps with the user in one decision packet, runs `build` and `check`, and asks the user to approve the generated README sheet. It never invents a palette.
+- **`design`** ([SKILL.md](agent-plugin/skills/design/SKILL.md)) designs a screen inside the installed package and refuses to start without one. It writes user stories, builds three full mockups in the project's stack (a conventional one and two that each change one named axis), and runs `capture` and `lint` on each until they're clean. The user then picks one; in a run with no user, the agent's marked pick is used. It builds the pick and has a fresh reviewer check the screenshots.
+- **The hook:** after an Edit or Write to a file lint reads, it runs `brandkit lint --hook` and passes the findings back to the agent as context. It only warns; CI is where lint fails. If brandkit isn't installed, the hook exits 0 and does nothing.
 
 ## Development
 
