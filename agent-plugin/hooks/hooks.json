@@ -1,0 +1,21 @@
+{
+  "description": "After an edit to CSS, HTML, HEEx, Elixir or Go template files, runs brandkit lint on that file and tells the agent about raw design values. Warns only; fails open when brandkit isn't installed.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh",
+            "args": [
+              "-c",
+              "p=$(command -v brandkit); s=; case \"$p\" in */shims/*) s=$p; p= ;; esac; [ -n \"$p\" ] && m=$(command -v mise) && [ \"$p\" -ef \"$m\" ] && s=$p && p=; if [ -z \"$p\" ] && command -v mise >/dev/null 2>&1; then p=$(mise -C / exec github:shermanhuman/brandkit -- sh -c 'command -v brandkit' </dev/null 2>/dev/null); case \"$p\" in */shims/*) p= ;; esac; fi; [ -z \"$p\" ] && p=$s; [ -n \"$p\" ] && \"$p\" lint --hook; exit 0"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
