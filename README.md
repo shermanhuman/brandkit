@@ -95,6 +95,8 @@ Exit status:
 
 Run `brandkit install --check` in a project's CI to catch hand edits to vendored brand files.
 
+`install` stages the new files beside the destination and checks them before it swaps them in, so a failed or refused install leaves the vendored files and `brandkit.lock` as they were. It refuses a destination that another repository in the lock already holds (two owners' `brand` repositories, say); give the second one its own `--dir`. It also refuses to install through a symlinked folder.
+
 Private brand repositories need a token: `$GH_TOKEN`, `$GITHUB_TOKEN`, or `gh auth token`. `$BRANDKIT_GITHUB_API` points install at another API host.
 
 ### Lint rules

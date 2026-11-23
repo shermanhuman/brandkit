@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -50,12 +51,13 @@ type fakeGitHub struct {
 
 func (f *fakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.auth = r.Header.Get("Authorization")
-	const prefix = "/repos/example/fixture-base-brand/"
-	p, ok := strings.CutPrefix(r.URL.Path, prefix)
-	if !ok {
+	// Any owner serves the same package, so two owners can share a name.
+	parts := strings.SplitN(strings.TrimPrefix(r.URL.Path, "/repos/"), "/", 3)
+	if len(parts) != 3 || parts[1] != "fixture-base-brand" {
 		http.NotFound(w, r)
 		return
 	}
+	p := parts[2]
 	switch {
 	case strings.HasPrefix(p, "commits/"):
 		c, ok := f.tags[strings.TrimPrefix(p, "commits/")]
@@ -275,5 +277,144 @@ func TestUntarLimits(t *testing.T) {
 	}
 	if err := untarLimits(pack(10, 10, 10), t.TempDir(), 10, 25); err == nil {
 		t.Error("no total size cap")
+	}
+}
+
+func newFake(t *testing.T) (*fakeGitHub, *Client, func()) {
+	t.Helper()
+	pkg := filepath.Join("..", "..", "testdata", "brands", "base")
+	fake := &fakeGitHub{
+		tags:     map[string]string{"v1": "aaaa1111"},
+		tarballs: map[string][]byte{"aaaa1111": tarball(t, pkg, "top", nil)},
+	}
+	srv := httptest.NewServer(fake)
+	return fake, &Client{API: srv.URL, HTTP: srv.Client()}, srv.Close
+}
+
+// snapshot reads every file under dir, keyed by its relative path.
+func snapshot(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	m := map[string]string{}
+	filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			rel, _ := filepath.Rel(dir, p)
+			data, _ := os.ReadFile(p)
+			m[rel] = string(data)
+		}
+		return nil
+	})
+	return m
+}
+
+// TestInstallRefusesSymlinks: a symlinked ancestor of the destination, or a
+// symlinked destination, is refused before anything is removed or written,
+// so the outside folder survives (A-M1).
+func TestInstallRefusesSymlinks(t *testing.T) {
+	_, c, done := newFake(t)
+	defer done()
+	for _, link := range []string{"vendor", "vendor/brand", "vendor/brand/fixture-base-brand"} {
+		outside := t.TempDir()
+		// The outside folder looks like whatever the link stands for.
+		target := outside
+		switch link {
+		case "vendor":
+			target = filepath.Join(outside, "brand", "fixture-base-brand")
+		case "vendor/brand":
+			target = filepath.Join(outside, "fixture-base-brand")
+		}
+		os.MkdirAll(target, 0o755)
+		sentinel := filepath.Join(target, "brandkit.json")
+		os.WriteFile(sentinel, []byte("outside"), 0o644)
+
+		project := t.TempDir()
+		lp := filepath.Join(project, filepath.FromSlash(link))
+		os.MkdirAll(filepath.Dir(lp), 0o755)
+		if err := os.Symlink(outside, lp); err != nil {
+			t.Skip("no symlinks here:", err)
+		}
+		_, err := c.Install(project, "example/fixture-base-brand", "v1", "", nil)
+		if err == nil || !strings.Contains(err.Error(), "is a symlink") {
+			t.Errorf("%s symlinked: %v", link, err)
+		}
+		if data, err := os.ReadFile(sentinel); err != nil || string(data) != "outside" {
+			t.Errorf("%s symlinked: the outside file was changed or removed (%q, %v)", link, data, err)
+		}
+		if got := snapshot(t, outside); len(got) != 1 {
+			t.Errorf("%s symlinked: files written outside the project: %v", link, got)
+		}
+		if _, err := os.Stat(filepath.Join(project, LockFile)); err == nil {
+			t.Errorf("%s symlinked: a lock was written", link)
+		}
+	}
+}
+
+// TestInstallRejectedBytesLeaveTheOldInstall: when a download for the
+// pinned commit doesn't match the lock's hashes, the installed tree and the
+// lock stay exactly as they were, and no staging folder is left (A-M2).
+func TestInstallRejectedBytesLeaveTheOldInstall(t *testing.T) {
+	fake, c, done := newFake(t)
+	defer done()
+	project := t.TempDir()
+	if _, err := c.Install(project, "example/fixture-base-brand", "v1", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	vendor := filepath.Join(project, "vendor", "brand")
+	tree := snapshot(t, vendor)
+	lock, _ := os.ReadFile(filepath.Join(project, LockFile))
+	l, err := ReadLock(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Same commit, changed bytes.
+	pkg := filepath.Join("..", "..", "testdata", "brands", "base")
+	fake.tarballs["aaaa1111"] = tarball(t, pkg, "top", func(rel string, d []byte) []byte {
+		if rel == "export/ui/tokens.css" {
+			return append(d, []byte("/* swapped */\n")...)
+		}
+		return d
+	})
+	_, err = c.Install(project, "example/fixture-base-brand", "v1", "vendor/brand", &l.Brands[0])
+	if err == nil || !strings.Contains(err.Error(), "differs from the hash") {
+		t.Fatalf("changed bytes: %v", err)
+	}
+	if got := snapshot(t, vendor); !maps.Equal(got, tree) {
+		t.Error("the installed tree changed after the hash check failed")
+	}
+	if got, _ := os.ReadFile(filepath.Join(project, LockFile)); !bytes.Equal(got, lock) {
+		t.Error("the lock changed after the hash check failed")
+	}
+	if n, err := Verify(project); err != nil || n != 1 {
+		t.Errorf("Verify after a rejected install: %d %v", n, err)
+	}
+}
+
+// TestInstallRefusesAnotherReposFolder: two owners' repositories with the
+// same name can't share a folder; the second is told to pick --dir (A-M3).
+func TestInstallRefusesAnotherReposFolder(t *testing.T) {
+	_, c, done := newFake(t)
+	defer done()
+	project := t.TempDir()
+	if _, err := c.Install(project, "acme/fixture-base-brand", "v1", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	tree := snapshot(t, filepath.Join(project, "vendor"))
+	_, err := c.Install(project, "other/fixture-base-brand", "v1", "", nil)
+	if err == nil || !strings.Contains(err.Error(), "acme/fixture-base-brand") || !strings.Contains(err.Error(), "--dir vendor/brand/other") {
+		t.Fatalf("same folder, other owner: %v", err)
+	}
+	if got := snapshot(t, filepath.Join(project, "vendor")); !maps.Equal(got, tree) {
+		t.Error("the first brand's files changed")
+	}
+	// Inside another brand's folder is refused too.
+	if _, err := c.Install(project, "other/fixture-base-brand", "v1", "vendor/brand/fixture-base-brand", nil); err == nil {
+		t.Error("installed inside another brand's folder")
+	}
+	// The suggested --dir works, and the lock holds both.
+	if _, err := c.Install(project, "other/fixture-base-brand", "v1", "vendor/brand/other", nil); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := Verify(project); err != nil || n != 2 {
+		t.Fatalf("Verify: %d %v", n, err)
 	}
 }

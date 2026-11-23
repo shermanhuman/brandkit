@@ -342,18 +342,75 @@ func ReadLock(project string) (*Lock, error) {
 	return &l, nil
 }
 
+// writeLock replaces brandkit.lock atomically: a temporary file in the
+// project, renamed over the old lock.
 func writeLock(project string, l *Lock) error {
 	sort.Slice(l.Brands, func(i, j int) bool { return l.Brands[i].Repo < l.Brands[j].Repo })
 	data, err := json.MarshalIndent(l, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(project, LockFile), append(data, '\n'), 0o644)
+	f, err := os.CreateTemp(project, ".brandkit.lock-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	_, err = f.Write(append(data, '\n'))
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(tmp, 0o644)
+	}
+	if err == nil {
+		err = os.Rename(tmp, filepath.Join(project, LockFile))
+	}
+	if err != nil {
+		os.Remove(tmp)
+	}
+	return err
 }
+
+// noSymlinks checks every existing component of rel below project, rel
+// itself included: each must be a real folder, not a symlink, so nothing
+// brandkit removes or writes there can land outside the project. A missing
+// component ends the check; brandkit creates the rest as real folders.
+func noSymlinks(project, rel string) error {
+	p := project
+	parts := strings.Split(rel, "/")
+	for i, part := range parts {
+		p = filepath.Join(p, part)
+		st, err := os.Lstat(p)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		at := strings.Join(parts[:i+1], "/")
+		if st.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%s is a symlink; brandkit won't install through it, because it could write outside the project. Replace it with a real folder or pick another --dir", at)
+		}
+		if !st.IsDir() {
+			return fmt.Errorf("%s isn't a folder", at)
+		}
+	}
+	return nil
+}
+
+// within reports whether a is b or a folder inside it (slash paths).
+func within(a, b string) bool { return a == b || strings.HasPrefix(a, b+"/") }
 
 // Install vendors repo at tag into project/dir/<repo name> and records it.
 // verify, when set, is the entry the lock already holds: the files must
 // hash the same.
+//
+// The new tree is staged next to the destination and checked first; only
+// then is it renamed into place and the lock replaced. On any error the
+// installed tree and the lock are left as they were.
 func (c *Client) Install(project, repo, tag, dir string, verify *Entry) (*Entry, error) {
 	if dir == "" {
 		dir = DefaultDir
@@ -364,6 +421,21 @@ func (c *Client) Install(project, repo, tag, dir string, verify *Entry) (*Entry,
 	dir, err := SafeRel(filepath.ToSlash(dir))
 	if err != nil {
 		return nil, fmt.Errorf("--dir: %w", err)
+	}
+	name := repo[strings.Index(repo, "/")+1:]
+	dest := path.Join(dir, name)
+	l, err := ReadLock(project)
+	if err != nil {
+		return nil, err
+	}
+	for _, x := range l.Brands {
+		if x.Repo != repo && (within(dest, x.Dir) || within(x.Dir, dest)) {
+			return nil, fmt.Errorf("%s would go in %s, which %s already holds (see %s); install it into another folder, for example --dir %s",
+				repo, dest, x.Repo, LockFile, path.Join(dir, repo[:strings.Index(repo, "/")]))
+		}
+	}
+	if err := noSymlinks(project, dest); err != nil {
+		return nil, err
 	}
 	commit, err := c.Commit(repo, tag)
 	if err != nil {
@@ -381,13 +453,23 @@ func (c *Client) Install(project, repo, tag, dir string, verify *Entry) (*Entry,
 	if err != nil {
 		return nil, fmt.Errorf("%s@%s: %w", repo, tag, err)
 	}
-	name := repo[strings.Index(repo, "/")+1:]
-	dest := path.Join(dir, name)
 	e := &Entry{Repo: repo, Tag: tag, Commit: commit, Dir: dest, Lint: path.Join(dest, cfg.Out, cfg.Lint), Files: map[string]string{}}
+
 	destAbs := filepath.Join(project, filepath.FromSlash(dest))
-	if err := os.RemoveAll(destAbs); err != nil {
+	parent := filepath.Dir(destAbs)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return nil, err
 	}
+	// MkdirAll creates real folders, but it follows any symlink that
+	// appeared since the check, so check again.
+	if err := noSymlinks(project, dest); err != nil {
+		return nil, err
+	}
+	stage, err := os.MkdirTemp(parent, ".brandkit-stage-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(stage)
 	for _, f := range files {
 		data, err := os.ReadFile(filepath.Join(src, filepath.FromSlash(f)))
 		if err != nil {
@@ -395,7 +477,7 @@ func (c *Client) Install(project, repo, tag, dir string, verify *Entry) (*Entry,
 		}
 		sum := sha256.Sum256(data)
 		e.Files[f] = hex.EncodeToString(sum[:])
-		p := filepath.Join(destAbs, filepath.FromSlash(f))
+		p := filepath.Join(stage, filepath.FromSlash(f))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return nil, err
 		}
@@ -403,21 +485,48 @@ func (c *Client) Install(project, repo, tag, dir string, verify *Entry) (*Entry,
 			return nil, err
 		}
 	}
+	if err := os.Chmod(stage, 0o755); err != nil {
+		return nil, err
+	}
 	if verify != nil {
 		for f, h := range verify.Files {
 			if e.Files[f] != h {
-				return nil, fmt.Errorf("%s: %s differs from the hash in %s", repo, f, LockFile)
+				return nil, fmt.Errorf("%s: %s differs from the hash in %s; the installed files were left as they were", repo, f, LockFile)
 			}
 		}
 	}
-	l, err := ReadLock(project)
-	if err != nil {
+
+	// Swap: move the old tree aside, the staged one in, then the lock.
+	old := ""
+	if _, err := os.Lstat(destAbs); err == nil {
+		old = stage + ".old"
+		if err := os.Rename(destAbs, old); err != nil {
+			return nil, err
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	restore := func() {
+		os.RemoveAll(destAbs)
+		if old != "" {
+			os.Rename(old, destAbs)
+		}
+	}
+	if err := os.Rename(stage, destAbs); err != nil {
+		restore()
 		return nil, err
 	}
 	l.Version = 1
 	l.Brands = slices.DeleteFunc(l.Brands, func(x Entry) bool { return x.Repo == repo })
 	l.Brands = append(l.Brands, *e)
-	return e, writeLock(project, l)
+	if err := writeLock(project, l); err != nil {
+		restore()
+		return nil, err
+	}
+	if old != "" {
+		os.RemoveAll(old)
+	}
+	return e, nil
 }
 
 // Verify checks the vendored files against the lock without the network
@@ -430,6 +539,10 @@ func Verify(project string) (int, error) {
 	}
 	var problems []string
 	for _, e := range l.Brands {
+		if err := noSymlinks(project, e.Dir); err != nil {
+			problems = append(problems, fmt.Sprintf("%s: %v", e.Repo, err))
+			continue
+		}
 		for f, h := range e.Files {
 			data, err := os.ReadFile(filepath.Join(project, filepath.FromSlash(e.Dir), filepath.FromSlash(f)))
 			if err != nil {
