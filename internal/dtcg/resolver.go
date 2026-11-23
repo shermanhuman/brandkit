@@ -156,7 +156,10 @@ func (r *Resolver) walkContext(e *Object, context string, stack []string, fn fun
 			if kind != "set" {
 				return fmt.Errorf("dtcg: resolver: %s can reference sets only, not modifier %s", name, n)
 			}
-			c := Clone(sub).(*Object)
+			c := overrideRef(sub, o)
+			if c == sub {
+				c = Clone(sub).(*Object)
+			}
 			c.Set("type", "set")
 			c.Set("name", n)
 			if err := r.walkContext(c, "", stack, fn); err != nil {
@@ -167,20 +170,30 @@ func (r *Resolver) walkContext(e *Object, context string, stack []string, fn fun
 			if err != nil {
 				return err
 			}
-			// Keys beside $ref extend the referenced document: they are
-			// merged over it (Resolver module, reference objects).
-			if len(o.Keys) > 1 {
-				doc = Clone(doc).(*Object)
-				local := Clone(o).(*Object)
-				local.Delete("$ref")
-				MergeInto(doc, local)
-			}
-			if err := fn(doc); err != nil {
+			if err := fn(overrideRef(doc, o)); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// overrideRef applies the keys beside $ref in ref to a clone of target.
+// They override target's top-level properties shallowly: an object beside
+// $ref replaces the referenced one whole (Resolver 2025.10 §4.2.2: "tools
+// MUST flatten these shallowly, meaning objects and arrays are not merged").
+// With no sibling keys, target itself is returned.
+func overrideRef(target, ref *Object) *Object {
+	if len(ref.Keys) <= 1 {
+		return target
+	}
+	out := Clone(target).(*Object)
+	for _, k := range ref.Keys {
+		if k != "$ref" {
+			out.Set(k, Clone(ref.Values[k]))
+		}
+	}
+	return out
 }
 
 func (r *Resolver) loadFile(ref string) (*Object, error) {
