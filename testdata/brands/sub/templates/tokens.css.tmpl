@@ -1,0 +1,16 @@
+/* {{.Brand}} colours, in the legacy layout: role names only, dark by
+   default, light on request. {{.GeneratedBy}} */
+:root {
+{{- range .Default.Decls}}
+  --{{.Name}}: {{.Value}};
+{{- end}}
+  color-scheme: {{.Default.ColorScheme}};
+}
+{{range .Themes}}{{if not .Default}}
+{{.Selector}} {
+{{- range .Changed}}
+  --{{.Name}}: {{.Value}};
+{{- end}}
+  color-scheme: {{.ColorScheme}};
+}
+{{end}}{{end -}}
