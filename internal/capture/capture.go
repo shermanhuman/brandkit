@@ -436,6 +436,18 @@ const probeJS = `(() => {
     const legend = d.querySelector(':scope > legend');
     return !(legend && legend.contains(el));
   };
+  // Text is invisible when it or any ancestor has opacity 0, display none
+  // or content-visibility hidden. Opacity isn't inherited and the background
+  // walk below can stop early, so this walks every ancestor on its own.
+  // (Computed visibility is inherited, so the element's own value is enough.)
+  const hidden = (el) => {
+    if (getComputedStyle(el).visibility !== 'visible') return true;
+    for (let e = el; e; e = e.parentElement) {
+      const s = getComputedStyle(e);
+      if (s.display === 'none' || parseFloat(s.opacity) === 0 || s.contentVisibility === 'hidden') return true;
+    }
+    return false;
+  };
   const iw = window.innerWidth;
   const doc = document.documentElement;
   const offenders = [];
@@ -459,7 +471,7 @@ const probeJS = `(() => {
     if (!text) continue;
     const cs = getComputedStyle(el);
     const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0 || cs.visibility !== 'visible' || cs.display === 'none' || parseFloat(cs.opacity) === 0) continue;
+    if (r.width === 0 || r.height === 0 || hidden(el)) continue;
     const bgs = []; let image = false;
     for (let e = el; e; e = e.parentElement) {
       const s = getComputedStyle(e);

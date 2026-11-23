@@ -336,3 +336,43 @@ button, input { background: #f8fafd; color: #aeb9c4; border: 0; font: inherit; }
 		t.Errorf("inactive %d, want 4", c.Inactive)
 	}
 }
+
+// TestContrastSkipsHiddenText: text inside an ancestor with opacity 0,
+// visibility hidden, display none or content-visibility hidden isn't
+// painted, so it needs no contrast ratio, even when its own box and
+// opacity look visible and the background walk stops before the hidden
+// ancestor (A-M6).
+func TestContrastSkipsHiddenText(t *testing.T) {
+	needChrome(t)
+	page := `<!doctype html><html lang="en"><head><title>h</title><style>
+body { background: #fff; font: 16px sans-serif; }
+span, p { color: #eee; background: #fff; }
+</style></head><body><main>
+<p>Visible faint</p>
+<div style="opacity:0"><div><span>Under opacity zero</span></div></div>
+<div style="visibility:hidden"><span>Under visibility hidden</span></div>
+<div style="content-visibility:hidden"><span>Under content-visibility</span></div>
+<div style="display:none"><span>Under display none</span></div>
+<div style="visibility:hidden"><span style="visibility:visible">Visible again</span></div>
+</main></body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(page)) }))
+	defer srv.Close()
+	rep, err := Run(context.Background(), Options{URL: srv.URL + "/", Out: t.TempDir(), Widths: []int{375}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	failed := map[string]bool{}
+	for _, f := range rep.Widths[0].Contrast.Failures {
+		failed[f.Text] = true
+	}
+	for _, text := range []string{"Visible faint", "Visible again"} {
+		if !failed[text] {
+			t.Errorf("%q should fail contrast: %+v", text, rep.Widths[0].Contrast)
+		}
+	}
+	for _, text := range []string{"Under opacity zero", "Under visibility hidden", "Under content-visibility", "Under display none"} {
+		if failed[text] {
+			t.Errorf("%q is hidden by an ancestor and needs no contrast", text)
+		}
+	}
+}
