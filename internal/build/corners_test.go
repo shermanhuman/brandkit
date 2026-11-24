@@ -2,11 +2,13 @@ package build
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/hex"
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -52,7 +54,7 @@ func TestCornersCSS(t *testing.T) {
 		"@property --px-bw {\n  syntax: \"<length>\";\n  inherits: false;",
 		// The radius goes to 0 only inside the scope, on every element
 		// there, so a nested [data-theme] can't bring it back.
-		"[data-corners=\"pixel\"],\n[data-corners=\"pixel\"] * {\n  --radius-selector: 0;\n  --radius-field: 0;\n  --radius-box: 0;",
+		"[data-corners=\"pixel\"],\n[data-corners=\"pixel\"] * {\n  --radius-selector: 0px;\n  --radius-field: 0px;\n  --radius-box: 0px;",
 		`:where([data-corners="pixel"]) .px-corners-sm {` + "\n  clip-path: " + StairClip(2, cornersAll) + ";",
 		`:where([data-corners="pixel"]) .px-corners-lg {` + "\n  clip-path: " + StairClip(4, cornersAll) + ";",
 		`:where([data-corners="pixel"]) .btn:not(input)::after,`, `:where([data-corners="pixel"]) .card::after,`, "border-color: inherit;",
@@ -119,7 +121,7 @@ func TestCornersCSS(t *testing.T) {
 	}
 	// Another scope, as a class.
 	cls := CornersCSS(&brand.Corners{Style: "pixel", Small: 2, Box: 4, Scope: ".marketing"})
-	if !strings.Contains(cls, ".marketing,\n.marketing * {\n  --radius-selector: 0;") || !strings.Contains(cls, ":where(.marketing) .btn,") || strings.Contains(cls, "data-corners") {
+	if !strings.Contains(cls, ".marketing,\n.marketing * {\n  --radius-selector: 0px;") || !strings.Contains(cls, ":where(.marketing) .btn,") || strings.Contains(cls, "data-corners") {
 		t.Errorf("scope .marketing isn't used:\n%s", cls[:min(len(cls), 1200)])
 	}
 
@@ -147,7 +149,10 @@ func hexOf(t *testing.T, th *brand.Theme, token string) string {
 // cornersMarkup puts a real DaisyUI outline button, text input and
 // bordered card at whole-pixel positions on a green page, in tab order:
 // first inside the corner scope, as on a marketing page, then the same
-// three outside it, as product UI.
+// three outside it, as product UI; then, in the scope again, DaisyUI
+// markup that depends on its own radius variables, pseudo-elements,
+// positions and parent focus: a tooltip, a radio-button join, an
+// indicator badge and the three collapse forms of an accordion.
 const cornersMarkup = `<!doctype html>
 <html lang="en">
 <head><link rel="stylesheet" href="/out.css"><style>*{transition:none!important} html,body{margin:0;background:rgb(0,255,0)!important}</style></head>
@@ -160,13 +165,23 @@ const cornersMarkup = `<!doctype html>
 <button id="app-btn" class="btn btn-outline" style="position:absolute;left:400px;top:40px;width:120px">Cancel</button>
 <input id="app-input" class="input" style="position:absolute;left:400px;top:120px;width:200px" value="sam@example.com">
 <div id="app-card" class="card card-border bg-base-100" tabindex="0" style="position:absolute;left:400px;top:200px;width:240px;height:120px"><div class="card-body">Card</div></div>
+<div data-corners="pixel">
+<div id="tip" class="tooltip tooltip-open" data-tip="Billed yearly" style="position:absolute;left:40px;top:420px"><button class="btn" tabindex="-1">Tip</button></div>
+<div class="join" style="position:absolute;left:160px;top:420px"><input id="join-a" class="join-item btn" type="radio" name="plan" aria-label="Monthly" tabindex="-1" checked><input id="join-b" class="join-item btn" type="radio" name="plan" aria-label="Yearly" tabindex="-1"></div>
+<div class="indicator" style="position:absolute;left:420px;top:420px"><span id="badge" class="indicator-item badge badge-secondary">9</span><button class="btn" tabindex="-1">Inbox</button></div>
+<div id="faq-check" class="collapse" style="position:absolute;left:40px;top:520px;width:200px;height:60px;background:#fff"><input id="faq-check-in" type="checkbox"><div class="collapse-title">Shipping</div><div class="collapse-content">Two days.</div></div>
+<div id="faq-radio" class="collapse" style="position:absolute;left:280px;top:520px;width:200px;height:60px;background:#fff"><input id="faq-radio-in" type="radio" name="faq"><div class="collapse-title">Returns</div><div class="collapse-content">Thirty days.</div></div>
+<details id="faq-details" class="collapse" style="position:absolute;left:520px;top:520px;width:160px;height:60px;background:#fff"><summary id="faq-details-in" class="collapse-title">Refunds</summary><div class="collapse-content">On request.</div></details>
+</div>
 </body>
 </html>
 `
 
-// TestPixelCornersRendered compiles the sub fixture (pixel corners, 2px
-// small and 4px box steps) with Tailwind against daisyUI 5.8.2, in both
-// theme forms, and reads pixels in Chrome. Inside the corner scope the cut
+// TestPixelCornersRendered loads the sub fixture (pixel corners, 2px
+// small and 4px box steps) with daisyUI 5.8.2 in three forms: both theme
+// forms compiled with Tailwind, and the prebuilt daisyui.css with
+// daisyui-themes.css and brand.css and no Tailwind. It reads pixels in
+// Chrome. Inside the corner scope the cut
 // corners show the page, the step pixels carry the outline, and after Tab
 // the stepped focus ring is drawn outside the shape in the brand's focus
 // colour. Outside it the same components keep the theme's smooth radius
@@ -197,9 +212,23 @@ func TestPixelCornersRendered(t *testing.T) {
 		t.Fatalf("focus colour: %v", err)
 	}
 	focus := color.RGBA{fh[0], fh[1], fh[2], 255}
-	for _, form := range []string{"plugin", "plain"} {
+	for _, form := range []string{"plugin", "plain", "prebuilt"} {
 		t.Run(form, func(t *testing.T) {
 			dir := t.TempDir()
+			if form == "prebuilt" {
+				// The page links daisyui.css, daisyui-themes.css and
+				// brand.css in that order; one file in the same order
+				// gives the same cascade layers.
+				var out bytes.Buffer
+				out.Write(prebuiltDaisy(t))
+				out.WriteString("\n")
+				out.Write(plain)
+				out.WriteString("\n")
+				out.Write(bc)
+				os.WriteFile(filepath.Join(dir, "out.css"), out.Bytes(), 0o644)
+				checkCorners(t, dir, focus, radii(t, b.Default()))
+				return
+			}
 			os.MkdirAll(filepath.Join(dir, "vendor"), 0o755)
 			os.MkdirAll(filepath.Join(dir, "css"), 0o755)
 			for _, f := range []string{"daisyui.js", "daisyui-theme.js"} {
@@ -231,11 +260,32 @@ func TestPixelCornersRendered(t *testing.T) {
 	}
 }
 
+// prebuiltDaisy is daisyUI 5.8.2's prebuilt daisyui.css.
+func prebuiltDaisy(t *testing.T) []byte {
+	t.Helper()
+	f, err := os.Open(filepath.Join("..", "..", "testdata", "daisyui", "5.8.2", "daisyui.css.gz"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	zr, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := io.ReadAll(zr)
+	if err != nil || !bytes.HasPrefix(data, []byte("/*! 🌼 daisyUI 5.8.2 ")) {
+		t.Fatalf("prebuilt daisyui.css: %v", err)
+	}
+	return data
+}
+
 // box is an element's border box, in whole CSS pixels, and its step.
+// focus is the element that Tab lands on, when that is a child.
 type box struct {
 	id         string
 	x, y, w, h int
 	u          int
+	focus      string
 }
 
 // radii are the theme's radius-field and radius-box in CSS pixels.
@@ -279,14 +329,25 @@ func checkCorners(t *testing.T, dir string, fc color.RGBA, radius map[string]flo
 	defer cancel()
 	ctx, c2 := context.WithTimeout(ctx, 60*time.Second)
 	defer c2()
-	if err := chromedp.Do(ctx, chromedp.EmulateViewport(720, 360, chromedp.EmulateScale(1)), chromedp.Navigate("http://"+ln.Addr().String()+"/")); err != nil {
+	if err := chromedp.Do(ctx, chromedp.EmulateViewport(720, 640, chromedp.EmulateScale(1)), chromedp.Navigate("http://"+ln.Addr().String()+"/")); err != nil {
 		t.Fatal(err)
 	}
-	rects, err := chromedp.Run(ctx, chromedp.Evaluate[[][4]float64](`["btn","input","card","app-btn","app-input","app-card"].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; })`))
-	if err != nil {
-		t.Fatal(err)
+	boxes := []box{{id: "btn", u: 2}, {id: "input", u: 2}, {id: "card", u: 4}, {id: "app-btn"}, {id: "app-input"}, {id: "app-card"},
+		{id: "faq-check", u: 4, focus: "faq-check-in"}, {id: "faq-radio", u: 4, focus: "faq-radio-in"}, {id: "faq-details", u: 4, focus: "faq-details-in"}}
+	rect := func(ids ...string) [][4]float64 {
+		t.Helper()
+		q := `["` + strings.Join(ids, `","`) + `"].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; })`
+		rects, err := chromedp.Run(ctx, chromedp.Evaluate[[][4]float64](q))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rects
 	}
-	boxes := []box{{id: "btn", u: 2}, {id: "input", u: 2}, {id: "card", u: 4}, {id: "app-btn"}, {id: "app-input"}, {id: "app-card"}}
+	var ids []string
+	for _, bx := range boxes {
+		ids = append(ids, bx.id)
+	}
+	rects := rect(ids...)
 	for i := range boxes {
 		r := rects[i]
 		if r[0] != float64(int(r[0])) || r[1] != float64(int(r[1])) || r[2] != float64(int(r[2])) || r[3] != float64(int(r[3])) {
@@ -327,7 +388,7 @@ func checkCorners(t *testing.T, dir string, fc color.RGBA, radius map[string]flo
 		}
 	}
 
-	pixel, app := boxes[:3], boxes[3:]
+	pixel, app := boxes[:3], boxes[3:6]
 	// style reads computed styles of an element: its clip-path, top-left
 	// radius, outline width and offset.
 	style := func(id string) [4]string {
@@ -376,7 +437,40 @@ func checkCorners(t *testing.T, dir string, fc color.RGBA, radius map[string]flo
 		}
 	}
 
-	// Keyboard focus: Tab to each element in turn. Inside the scope the
+	// A tooltip's tail sits under its bubble, 1px above the bubble's
+	// bottom edge (DaisyUI's --tt-overlap; the radius variables have to be
+	// lengths for its calc to work), the bubble 8px above the trigger.
+	tip := rect("tip")[0]
+	tx, ty := int(tip[0]+tip[2]/2), int(tip[1])
+	if bubble, tail := at(img, tx, ty-10), at(img, tx, ty-7); near(bubble, green) || !near(tail, bubble) {
+		t.Errorf("tooltip: tail pixel 7px above the trigger is %v, want the bubble's %v", tail, bubble)
+	}
+	// A radio-button join draws its labels: DaisyUI writes them in the
+	// input's ::after, which the outline layer mustn't take over.
+	for i, r := range rect("join-a", "join-b") {
+		x0, y0, x1, y1 := int(r[0])+4, int(r[1])+4, int(r[0]+r[2])-4, int(r[1]+r[3])-4
+		bg, text := at(img, x0, (y0+y1)/2), false
+		for y := y0; y < y1 && !text; y++ {
+			for x := x0; x < x1; x++ {
+				if c := at(img, x, y); !near(c, bg) {
+					text = true
+					break
+				}
+			}
+		}
+		if !text {
+			t.Errorf("join item %d: no label drawn", i+1)
+		}
+	}
+	// An indicator badge keeps DaisyUI's absolute position, in every form.
+	if pos, err := chromedp.Run(ctx, chromedp.Evaluate[[2]string](`(() => { const s = getComputedStyle(document.getElementById("badge")); return [s.position, s.clipPath]; })()`)); err != nil {
+		t.Fatal(err)
+	} else if pos[0] != "absolute" || !strings.HasPrefix(pos[1], "polygon(") {
+		t.Errorf("indicator badge: position %q, clip-path %q; want absolute and a polygon", pos[0], pos[1])
+	}
+
+	// Keyboard focus: Tab to each element in turn (into a collapse, onto
+	// its checkbox, radio or summary). Inside the scope the
 	// stepped ring sits 2px outside the shape and 2px wide, in the brand's
 	// focus colour; outside it DaisyUI's own outline is drawn, unclipped.
 	for _, bx := range boxes {
@@ -387,8 +481,12 @@ func checkCorners(t *testing.T, dir string, fc color.RGBA, radius map[string]flo
 		if err != nil {
 			t.Fatal(err)
 		}
-		if active != bx.id {
-			t.Fatalf("Tab focused %q, want %q", active, bx.id)
+		want := bx.id
+		if bx.focus != "" {
+			want = bx.focus
+		}
+		if active != want {
+			t.Fatalf("Tab focused %q, want %q", active, want)
 		}
 		img := shot()
 		if bx.u == 0 {

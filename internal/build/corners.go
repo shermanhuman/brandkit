@@ -40,6 +40,37 @@ import (
 // on any focus, everything else on keyboard focus.
 const focusSel = ":is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open)"
 
+// focusParents are the components DaisyUI rings when a child has focus,
+// with its selector for that: a collapse for its checkbox, radio or
+// summary (the accordion forms), a selectable card for its checkbox or
+// radio, a button or toggle for anything inside it, a label tab for its
+// checked radio. They are listed one by one, not as a bare
+// :has(:focus-visible) on every box, so a card isn't ringed for a button
+// inside it.
+var focusParents = []struct{ comp, has string }{
+	{".btn", ":has(:focus-visible)"},
+	{".toggle", ":has(:focus-visible)"},
+	{".tabs-box > .tab", ":is(label):has(:checked:focus-visible)"},
+	{".card", ":has(> :is([type=checkbox], [type=radio]):focus-visible)"},
+	{".collapse", ":has(> input:is([type=checkbox], [type=radio]):focus-visible)"},
+	{".collapse", ":has(summary:focus-visible)"},
+}
+
+// focusSels is the focused form of each component in list, and the
+// parent forms of those in focusParents.
+func focusSels(list []string) string {
+	var out []string
+	for _, c := range list {
+		out = append(out, c+focusSel)
+		for _, f := range focusParents {
+			if f.comp == c {
+				out = append(out, c+f.has)
+			}
+		}
+	}
+	return strings.Join(out, ",\n")
+}
+
 // cornerSmall are the selector- and field-size components; cornerBox the
 // boxes. cornerOutlined are those of them that draw a border by default,
 // with the width DaisyUI gives it.
@@ -288,10 +319,16 @@ func CornersCSS(c *brand.Corners) string {
 	p("   focus ring's colour. */\n")
 	p("\n@property --px-bw {\n  syntax: \"<length>\";\n  inherits: false;\n  initial-value: 0px;\n}\n")
 	// On every element in the scope, so a nested [data-theme] can't bring
-	// its radius back to the components inside it.
-	p("\n%s,\n%s * {\n  --radius-selector: 0;\n  --radius-field: 0;\n  --radius-box: 0;\n}\n", scope, scope)
-	// Positioned, for the ::after outline; in a layer, so DaisyUI's and
-	// Tailwind's own position wins.
+	// its radius back to the components inside it. Lengths, not bare 0:
+	// DaisyUI computes others from them (a tooltip's --tt-overlap is
+	// clamp(1px, calc(var(--radius-field) / 8), 2px)), and a bare 0 there
+	// makes the whole value invalid.
+	p("\n%s,\n%s * {\n  --radius-selector: 0px;\n  --radius-field: 0px;\n  --radius-box: 0px;\n}\n", scope, scope)
+	// Positioned, for the ::after outline; in the base layer, so DaisyUI's
+	// and Tailwind's own position wins. base is the first layer both in a
+	// Tailwind build and on a page that loads the prebuilt daisyui.css,
+	// which declares no components layer: there a components layer that
+	// brand.css opened would come last and win.
 	var hosts []string
 	for _, h := range append(append([]string(nil), cornerOverlaySmall...), cornerBox...) {
 		switch h {
@@ -302,7 +339,7 @@ func CornersCSS(c *brand.Corners) string {
 			hosts = append(hosts, h)
 		}
 	}
-	p("\n@layer components {\n  :where(%s) :where(%s) {\n    position: relative;\n  }\n}\n", scope, strings.Join(hosts, ", "))
+	p("\n@layer base {\n  :where(%s) :where(%s) {\n    position: relative;\n  }\n}\n", scope, strings.Join(hosts, ", "))
 	p("\n%s {\n  --px-bw: var(--border, 1px);\n}\n", in(sels(cornerOutlined, "")))
 	all := append(append([]string(nil), cornerSmall...), cornerBox...)
 	for _, u := range cornerBorderUtils {
@@ -326,14 +363,23 @@ func CornersCSS(c *brand.Corners) string {
 		p("\n%s {\n  outline: %spx solid var(--px-focus, var(--color-base-content));\n  outline-offset: 0;\n  clip-path: %s;\n}\n",
 			in(sel), brand.Num(focusGap(u)+focusWidth), stairFocusClip(u, mask))
 	}
-	focus(sels(cornerSmall, focusSel), sm, cornersAll)
-	focus(sels(cornerBox, focusSel), lg, cornersAll)
+	focus(focusSels(cornerSmall), sm, cornersAll)
+	focus(focusSels(cornerBox), lg, cornersAll)
 	p("\n/* Joined items keep their inner corners square. */\n")
+	// The band goes only on items that have the outline layer: an input
+	// button's ::after is DaisyUI's label.
+	overlayHosts := ":is(" + strings.Join(append(append([]string(nil), cornerOverlaySmall...), cornerBox...), ", ") + ")::after"
 	for _, j := range joinVariants {
 		p("\n%s {\n  clip-path: %s;\n}\n", in(j.sel), StairClip(sm, j.mask))
-		p("\n%s {\n  clip-path: %s;\n}\n", in(j.sel+"::after"), stairBand(sm, j.mask))
+		p("\n%s {\n  clip-path: %s;\n}\n", in(j.sel+overlayHosts), stairBand(sm, j.mask))
 		field(fmt.Sprintf("%s:is(input.input, textarea.textarea)", j.sel), sm, j.mask)
-		focus(j.sel+focusSel, sm, j.mask)
+		jf := []string{j.sel + focusSel}
+		for _, f := range focusParents {
+			if !strings.Contains(f.comp, " ") {
+				jf = append(jf, j.sel+f.comp+f.has)
+			}
+		}
+		focus(strings.Join(jf, ",\n"), sm, j.mask)
 	}
 	return w.String()
 }
