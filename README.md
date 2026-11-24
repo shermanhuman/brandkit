@@ -152,6 +152,7 @@ Limits:
 - Elements that scroll (a `modal-box` or `menu` with its own scrollbar) carry the outline layer with their content.
 - A `.btn` on an `input` (a submit button) has no `::after`, so it gets no outline pixels on the steps.
 - Radios stay round, and DaisyUI's other rounded parts (avatars, `rounded-full` utilities) are left to R10.
+- `clip-path` also cuts whatever hangs outside a stepped element. A tooltip or dropdown opened inside a stepped `card` (or any other stepped box) is cut at the box's edge. Inside the scope, keep tooltips, dropdowns and other popovers outside stepped boxes, and capture their open state: hover and open states aren't in a default capture.
 
 ### Brand arc
 
@@ -187,7 +188,7 @@ With `--cdp`, brandkit attaches to a running browser, such as one a Playwright e
 `agent-plugin/` is a Claude Code plugin with two skills and one hook.
 
 - **`brand`** ([SKILL.md](agent-plugin/skills/brand/SKILL.md)) defines or updates a brand package. It inventories the existing logos, token files, CSS and drafts, drafts the DTCG package with every conflict listed, settles the gaps with the user in one decision packet, runs `build` and `check`, and asks the user to approve the generated README sheet. It never invents a palette.
-- **`design`** ([SKILL.md](agent-plugin/skills/design/SKILL.md)) designs a screen inside the installed package; it installs the brand's package if one exists and refuses to start when none does. It writes user stories, builds three full mockups in the project's stack (a conventional one and two that each change one named axis), and runs `capture` and `lint` on each until they're clean. The user then picks one; in a run with no user, the agent's marked pick is used. It builds the pick and has a fresh reviewer check the screenshots.
+- **`design`** ([SKILL.md](agent-plugin/skills/design/SKILL.md)) designs a screen inside the installed package; it installs the brand's package if one exists and refuses to start when none does. It writes user stories, builds three full mockups in the project's stack (a conventional one and two that each change one named axis), and runs `capture` and `lint` on each until they're clean or have had three fix rounds. The user then picks one; in a run with no user, the agent's marked pick is used. It builds the pick and has a fresh reviewer check the screenshots.
 - **The hook:** after an Edit or Write to a file lint reads, it runs `brandkit lint --hook` and passes the findings back to the agent as context. The brand comes from the nearest `brandkit.lock` above the edited file. It only warns and always exits 0; CI is where lint fails. If lint can't run (the lock doesn't parse, or the brand's `lint.json` is missing until `brandkit install`), the hook tells the agent why.
 
 The hook uses `brandkit` from PATH, or asks mise for it (`mise which`, from the project's folder, so the project's pinned version is used). It never installs anything. If neither has brandkit and the project has a `brandkit.lock`, the hook tells the agent that brandkit isn't installed; otherwise it does nothing.

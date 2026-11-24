@@ -32,7 +32,7 @@ Take these from the plan or issue when one exists; ask only what they don't answ
 - `README.md` and its sheet images: the brand sheet, including its do and don't;
 - the generated CSS in `export/ui/` (`tokens.css`, `brand.css`, the DaisyUI theme files) and `export/lint.json`;
 - the theme names and which one is the default;
-- the corner style. When `lint.json` has `"corners": "pixel"`, the brand cuts corners into pixel steps on marketing pages only; product UI keeps the smooth radius. On a marketing page, put the scope (`data-corners="pixel"` unless the brand's `brand.css` names another) on `<html>` or `<body>`, load `brand.css` after the DaisyUI theme, leave DaisyUI's components to it, put `px-corners-sm` (controls) or `px-corners-lg` (panels) on your own boxes, and never add `rounded-*` or `border-radius` (lint R10, on the files `cornerPages` matches). A custom box with a border other than Tailwind's `border`, `border-2`, `border-4` or `border-8` sets `--px-bw` to its width, or its steps lose their outline. In product UI, use the radius as usual and never the scope.
+- the corner style. When `lint.json` has `"corners": "pixel"`, the brand's corners are pixel-stepped on marketing pages only; read [references/corners.md](references/corners.md) before building one.
 
 **No lock:** if the brand's package already exists (the plan, the host's rules or the user say where), run `brandkit install owner/repo@tag`, commit `vendor/brand/` and `brandkit.lock`, and go on. Only when no package exists, stop and say so: the brand has to be defined first, with the `brand` skill and the user. Don't derive a palette from the existing CSS, a screenshot or the product's category.
 
@@ -73,7 +73,7 @@ brandkit capture --url "<mockup url>?state=worst" --widths 320,375,640,1280,1920
 
 **Clean means:**
 
-- lint's last line names the brand, counts at least one file checked, and shows 0 errors and 0 warnings (lint exits 0 on warnings alone, so read the line);
+- lint's last line names the brand, counts at least one file checked, and shows 0 errors and 0 warnings (lint exits 0 on warnings alone, so read the line); on a marketing page of a pixel-corner brand, also that its sources match a `cornerPages` glob, or R10 never read them;
 - each `report.json` summary shows `axeSeriousCritical: 0`, `contrastFailures: 0` and no `overflowWidths`. Disabled and inert controls are exempt from contrast (WCAG 1.4.3), and capture skips them.
 
 **Lint coverage:** lint reads CSS, HTML, HEEx, Elixir `~H` and Go templates, and lists any file it skipped. For any other stack (JSX, TSX, Vue, Svelte), lint the rendered HTML (save the page's HTML from the running mockup) and the built CSS with `--compiled`, and say in that option's checks which source files lint couldn't read. Zero files checked is not clean.
