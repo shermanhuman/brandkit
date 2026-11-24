@@ -193,9 +193,33 @@ Drawn from the DaisyUI theme variables (`--color-*`, `--radius-*`, `--border`) t
 
 ## Brand assets
 
-Everything the package's `install` list ships except token files, Markdown, the README and the files brandkit generates, grouped by folder. Files that differ only in format or scale (`-2x`) share a row; transparent images are drawn on the theme ground they're made for.
+Everything the package's `install` list ships except token files, Markdown, the README and the files brandkit generates, grouped by folder; a base brand vendored under it shows only its own `install` files, under the same rule. Files that differ only in format or scale (`-2x`) share a row; transparent images are drawn on the theme ground they're made for.
+
+### `vendor/fixture-base/assets`
+
+From Fixture Base, vendored in this package: its own `install` files only.
+
+| Preview | Files | Use |
+|---|---|---|
+| <img src="export/sheet/asset-6b0a001f.svg" alt=""> | [`banner-2x.png`](vendor/fixture-base/assets/banner-2x.png)<br>[`banner-4x.png`](vendor/fixture-base/assets/banner-4x.png) | banner, for dark grounds (shown on Night), 3200×400 |
+| <img src="vendor/fixture-base/assets/card.png" width="120" alt=""> | [`card.png`](vendor/fixture-base/assets/card.png) | image, 120×63 |
+| <img src="export/sheet/asset-79d63aaa.svg" alt=""> | [`favicon.ico`](vendor/fixture-base/assets/favicon.ico)<br>[`favicon.svg`](vendor/fixture-base/assets/favicon.svg) | the favicon: SVG for current browsers; ICO for older browsers and `/favicon.ico` requests |
+|  | [`head.html`](vendor/fixture-base/assets/head.html) | the `<head>` tags that load the favicon set (shown below) |
+| <img src="export/sheet/asset-91ff0f80.svg" alt=""> | [`lockup-day.svg`](vendor/fixture-base/assets/lockup-day.svg) | image, for dark grounds (shown on Night) |
+| <img src="export/sheet/asset-0b95891a.svg" alt=""> | [`lockup-night.svg`](vendor/fixture-base/assets/lockup-night.svg) | image, for dark grounds (shown on Night) |
+| <img src="export/sheet/asset-5cb92973.svg" alt=""> | [`mark.svg`](vendor/fixture-base/assets/mark.svg) | image, for dark grounds (shown on Night) |
+| <img src="export/sheet/asset-f5f4144f.svg" alt=""> | [`pixel-1x.png`](vendor/fixture-base/assets/pixel-1x.png)<br>[`pixel-2x.png`](vendor/fixture-base/assets/pixel-2x.png) | image, for dark grounds (shown on Night), 48×16 |
+
+`head.html`, to paste into the page's `<head>` (serve the files from the site root):
+
+```html
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+```
 
 ### `vendor/fixture-base/fonts`
+
+From Fixture Base, vendored in this package: its own `install` files only.
 
 | Preview | Files | Use |
 |---|---|---|
@@ -210,9 +234,9 @@ Everything the package's `install` list ships except token files, Markdown, the 
 
 | Preview | Files | Use |
 |---|---|---|
-| <img src="export/sheet/asset-assets-lockup-day.svg" alt=""> | [`lockup-day.svg`](assets/lockup-day.svg) | the Day lockup, as under Logo and clear space, for light grounds (shown on Day) |
-| <img src="export/sheet/asset-assets-lockup-night.svg" alt=""> | [`lockup-night.svg`](assets/lockup-night.svg) | the Night lockup, as under Logo and clear space, for dark grounds (shown on Night) |
-| <img src="export/sheet/asset-assets-mark.svg" alt=""> | [`mark.svg`](assets/mark.svg) | the mark on its own, for dark grounds (shown on Night) |
+| <img src="export/sheet/asset-f342a533.svg" alt=""> | [`lockup-day.svg`](assets/lockup-day.svg) | the Day lockup, as under Logo and clear space, for light grounds (shown on Day) |
+| <img src="export/sheet/asset-7bccc048.svg" alt=""> | [`lockup-night.svg`](assets/lockup-night.svg) | the Night lockup, as under Logo and clear space, for dark grounds (shown on Night) |
+| <img src="export/sheet/asset-92f0df33.svg" alt=""> | [`mark.svg`](assets/mark.svg) | the mark on its own, for dark grounds (shown on Night) |
 
 ## Do and don't
 

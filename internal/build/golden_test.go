@@ -11,6 +11,7 @@ import (
 
 	"github.com/shermanhuman/brandkit/internal/brand"
 	"github.com/shermanhuman/brandkit/internal/browser"
+	"github.com/shermanhuman/brandkit/internal/install"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -107,15 +108,46 @@ func TestGoldenImages(t *testing.T) {
 	}
 }
 
-// TestSubVendorsBase keeps the sub fixture's vendored base in step with the base.
+// TestSubVendorsBase keeps the sub fixture's vendored base what
+// `brandkit install` would write from the base fixture: every file it
+// ships, byte for byte. After changing the base, copy them again:
+// go test ./internal/build -run TestSubVendorsBase -update.
 func TestSubVendorsBase(t *testing.T) {
-	for _, f := range []string{"primitives", "semantic", "night", "day"} {
-		a, _ := os.ReadFile(filepath.Join(fixtureDir("base"), "tokens", f+".tokens.json"))
-		b, _ := os.ReadFile(filepath.Join(fixtureDir("sub"), "vendor", "fixture-base", "tokens", f+".tokens.json"))
+	files, _, err := install.Files(fixtureDir("base"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vendor := filepath.Join(fixtureDir("sub"), "vendor", "fixture-base")
+	want := map[string]bool{}
+	for _, f := range files {
+		want[f] = true
+		a, _ := os.ReadFile(filepath.Join(fixtureDir("base"), filepath.FromSlash(f)))
+		p := filepath.Join(vendor, filepath.FromSlash(f))
+		if *update {
+			os.MkdirAll(filepath.Dir(p), 0o755)
+			if err := os.WriteFile(p, a, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		b, _ := os.ReadFile(p)
 		if len(a) == 0 || !bytes.Equal(a, b) {
-			t.Errorf("sub/vendor/fixture-base/tokens/%s.tokens.json differs from base", f)
+			t.Errorf("sub/vendor/fixture-base/%s differs from base (run go test ./internal/build -run TestSubVendorsBase -update)", f)
 		}
 	}
+	filepath.WalkDir(vendor, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(vendor, p)
+		if !want[filepath.ToSlash(rel)] {
+			if *update {
+				return os.Remove(p)
+			}
+			t.Errorf("sub/vendor/fixture-base/%s isn't something the base ships", rel)
+		}
+		return nil
+	})
 }
 
 func TestExtendsOverrides(t *testing.T) {

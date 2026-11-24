@@ -222,52 +222,124 @@ var daisyRadiusUse = map[string]string{
 	"radius-box":      "cards, modals, alerts",
 }
 
-// radiusUse names the DaisyUI radius variables a token feeds in a theme.
-func radiusUse(th *brand.Theme, token string) string {
+// radiusVars lists the DaisyUI radius variables a token feeds in a theme.
+func radiusVars(th *brand.Theme, token string) []string {
 	ext := th.Tokens.Extensions.Object(brand.ExtDaisyUI)
 	if ext == nil {
-		return ""
+		return nil
 	}
-	var uses []string
+	var vars []string
 	for _, k := range []string{"radius-selector", "radius-field", "radius-box"} {
 		if v, ok := ext.Get(k); ok && v == "{"+token+"}" {
-			uses = append(uses, "--"+k+": "+daisyRadiusUse[k])
+			vars = append(vars, k)
 		}
+	}
+	return vars
+}
+
+// radiusUse names the DaisyUI radius variables a token feeds in a theme.
+func radiusUse(th *brand.Theme, token string) string {
+	var uses []string
+	for _, k := range radiusVars(th, token) {
+		uses = append(uses, "--"+k+": "+daisyRadiusUse[k])
 	}
 	return strings.Join(uses, "; ")
 }
 
-// radiusSheet draws a button, a field and a card with each radius.
+// radiusShape draws one component with a radius at x, y and returns its width.
+type radiusShape func(w *bytes.Buffer, x, y, px float64, p palette) float64
+
+var (
+	shapeCheckbox radiusShape = func(w *bytes.Buffer, x, y, px float64, p palette) float64 {
+		fmt.Fprintf(w, `<rect x="%s" y="%s" width="24" height="24" rx="%s" fill="%s"/>`, brand.Num(x), brand.Num(y+8), brand.Num(min(px, 12)), p.primary)
+		fmt.Fprintf(w, `<path d="M%s %sl5 5 9-10" fill="none" stroke="%s" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`, brand.Num(x+5), brand.Num(y+20), p.onPrimary)
+		svgText(w, x+32, y+25, p.fg, `font-size="14"`, "Checkbox")
+		return 96
+	}
+	shapeBadge radiusShape = func(w *bytes.Buffer, x, y, px float64, p palette) float64 {
+		fmt.Fprintf(w, `<rect x="%s" y="%s" width="64" height="24" rx="%s" fill="%s"/>`, brand.Num(x), brand.Num(y+8), brand.Num(min(px, 12)), p.primary)
+		svgText(w, x+32, y+25, p.onPrimary, `font-weight="700" font-size="12" text-anchor="middle"`, "Badge")
+		return 64
+	}
+	shapeButton radiusShape = func(w *bytes.Buffer, x, y, px float64, p palette) float64 {
+		fmt.Fprintf(w, `<rect x="%s" y="%s" width="96" height="40" rx="%s" fill="%s"/>`, brand.Num(x), brand.Num(y), brand.Num(min(px, 20)), p.primary)
+		svgText(w, x+48, y+25, p.onPrimary, `font-weight="700" font-size="14" text-anchor="middle"`, "Button")
+		return 96
+	}
+	shapeField radiusShape = func(w *bytes.Buffer, x, y, px float64, p palette) float64 {
+		fmt.Fprintf(w, `<rect x="%s" y="%s" width="139" height="39" rx="%s" fill="%s" stroke="%s" stroke-opacity="0.7"/>`, brand.Num(x+0.5), brand.Num(y+0.5), brand.Num(min(px, 19.5)), p.bg, p.fg)
+		svgText(w, x+12, y+25, p.fg, `font-size="14" fill-opacity="0.8"`, "Field")
+		return 140
+	}
+	shapeCard radiusShape = func(w *bytes.Buffer, x, y, px float64, p palette) float64 {
+		fmt.Fprintf(w, `<rect x="%s" y="%s" width="127" height="71" rx="%s" fill="%s" stroke="%s"/>`, brand.Num(x+0.5), brand.Num(y+0.5), brand.Num(min(px, 35.5)), p.b200, p.b300)
+		svgText(w, x+14, y+24, p.fg, `font-weight="700" font-size="14"`, "Card")
+		svgText(w, x+14, y+44, p.fg, `font-size="12" fill-opacity="0.8"`, "a box of content")
+		return 128
+	}
+	// radiusShapes are the components each DaisyUI radius variable shapes.
+	radiusShapes = map[string][]radiusShape{
+		"radius-selector": {shapeCheckbox, shapeBadge},
+		"radius-field":    {shapeButton, shapeField},
+		"radius-box":      {shapeCard},
+	}
+)
+
+// shapesFor is what a radius token is drawn on: the components the DaisyUI
+// variables it feeds shape, or a button, a field and a card when it feeds none.
+func shapesFor(th *brand.Theme, token string) []radiusShape {
+	var out []radiusShape
+	for _, k := range radiusVars(th, token) {
+		out = append(out, radiusShapes[k]...)
+	}
+	if len(out) == 0 {
+		out = []radiusShape{shapeButton, shapeField, shapeCard}
+	}
+	return out
+}
+
+// shapesWidth is the width a row of shapes takes, measured by drawing it.
+func shapesWidth(shapes []radiusShape) float64 {
+	var w bytes.Buffer
+	x := 0.0
+	for i, sh := range shapes {
+		if i > 0 {
+			x += 12
+		}
+		x += sh(&w, x, 0, 0, palette{})
+	}
+	return x
+}
+
+// radiusSheet draws each radius on the components it shapes.
 func (s *sheet) radiusSheet() ([]byte, error) {
 	sets := map[string][]dimen{}
+	pw := 420.0
 	for _, th := range s.b.Themes {
 		ds, err := s.dimens(th, s.rules.Radius)
 		if err != nil {
 			return nil, err
 		}
 		sets[th.Name] = ds
+		for _, d := range ds {
+			pw = max(pw, 2*panelPad+shapesWidth(shapesFor(th, d.name)))
+		}
 	}
 	const rowH = 132.0
-	const pw = 420.0
 	return s.panels(pw, func(th *brand.Theme) float64 { return float64(len(sets[th.Name])) * rowH }, func(w *bytes.Buffer, th *brand.Theme, p palette) {
 		for i, d := range sets[th.Name] {
 			y := float64(i) * rowH
-			rx := brand.Num(min(d.px, 18))
 			fmt.Fprintf(w, `<text x="0" y="%s" fill="%s"><tspan font-weight="700">%s</tspan> · %s</text>`, brand.Num(y+16), p.fg, html.EscapeString(d.name), html.EscapeString(dimenText(d)))
 			if u := radiusUse(th, d.name); u != "" {
 				svgText(w, 0, y+34, p.fg, `fill-opacity="0.8" font-size="12"`, "DaisyUI "+u)
 			}
-			sy := y + 46
-			// button
-			fmt.Fprintf(w, `<rect x="0" y="%s" width="96" height="40" rx="%s" fill="%s"/>`, brand.Num(sy), rx, p.primary)
-			svgText(w, 48, sy+25, p.onPrimary, `font-weight="700" font-size="14" text-anchor="middle"`, "Button")
-			// field
-			fmt.Fprintf(w, `<rect x="108.5" y="%s" width="139" height="39" rx="%s" fill="%s" stroke="%s" stroke-opacity="0.7"/>`, brand.Num(sy+0.5), rx, p.bg, p.fg)
-			svgText(w, 120, sy+25, p.fg, `font-size="14" fill-opacity="0.8"`, "Field")
-			// card
-			fmt.Fprintf(w, `<rect x="260.5" y="%s" width="127" height="71" rx="%s" fill="%s" stroke="%s"/>`, brand.Num(sy+0.5), rx, p.b200, p.b300)
-			svgText(w, 274, sy+24, p.fg, `font-weight="700" font-size="14"`, "Card")
-			svgText(w, 274, sy+44, p.fg, `font-size="12" fill-opacity="0.8"`, "a box of content")
+			x := 0.0
+			for j, sh := range shapesFor(th, d.name) {
+				if j > 0 {
+					x += 12
+				}
+				x += sh(w, x, y+46, d.px, p)
+			}
 		}
 	}), nil
 }

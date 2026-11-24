@@ -117,8 +117,9 @@ type Brand struct {
 	Themes   []*Theme // the default theme first, then in resolver order
 }
 
-// Load reads a brand package from dir.
-func Load(dir string) (*Brand, error) {
+// ReadConfig reads dir's brandkit.json with its defaults filled in, without
+// loading the tokens it names.
+func ReadConfig(dir string) (*Config, error) {
 	data, err := os.ReadFile(filepath.Join(dir, ConfigFile))
 	if err != nil {
 		return nil, err
@@ -130,6 +131,16 @@ func Load(dir string) (*Brand, error) {
 		return nil, fmt.Errorf("%s: %w", ConfigFile, err)
 	}
 	c.defaults()
+	return &c, nil
+}
+
+// Load reads a brand package from dir.
+func Load(dir string) (*Brand, error) {
+	cp, err := ReadConfig(dir)
+	if err != nil {
+		return nil, err
+	}
+	c := *cp
 	if c.Name == "" || c.Resolver == "" {
 		return nil, fmt.Errorf("%s: name and resolver are required", ConfigFile)
 	}

@@ -2,11 +2,14 @@ package build
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"image"
+	stdcolor "image/color"
 	_ "image/gif" // decoders for asset previews
 	_ "image/jpeg"
-	_ "image/png"
+	"image/png"
 	"io/fs"
 	"os"
 	"path"
@@ -27,6 +30,9 @@ import (
 //   - except token sources (*.tokens.json, *.resolver.json), Markdown
 //     files, dotfiles, the README and its sheet folder, and the files
 //     brandkit generates;
+//   - inside a vendored brand package (a folder under the package that
+//     holds a brandkit.json), only that package's own install files,
+//     under the same exclusions relative to it;
 //   - grouped by folder, in `install` order; within a folder, files whose
 //     names differ only in extension or a -1x/-2x/@2x scale suffix share a
 //     row (mapleset-leaf-plum.svg and mapleset-leaf-plum-4x.png).
@@ -37,7 +43,7 @@ import (
 // its colours); an opaque image is shown as it is.
 
 // AssetRule is the Brand assets rule in one line, as the sheet states it.
-const AssetRule = "Everything the package's `install` list ships except token files, Markdown, the README and the files brandkit generates, grouped by folder. Files that differ only in format or scale (`-2x`) share a row; transparent images are drawn on the theme ground they're made for."
+const AssetRule = "Everything the package's `install` list ships except token files, Markdown, the README and the files brandkit generates, grouped by folder; a base brand vendored under it shows only its own `install` files, under the same rule. Files that differ only in format or scale (`-2x`) share a row; transparent images are drawn on the theme ground they're made for."
 
 var scaleSuffixRe = regexp.MustCompile(`(?:[-@]\d+(?:\.\d+)?x)$`)
 
@@ -48,21 +54,65 @@ type assetGroup struct {
 
 type assetDir struct {
 	dir    string
+	from   string // the vendored brand package's name, if the folder is in one
 	groups []*assetGroup
 }
 
-func (s *sheet) skipAsset(p string) bool {
-	c := s.b.Config
+// pkgFor finds the brand package a file belongs to: the nearest folder
+// above it that holds a brandkit.json (a base installed under vendor), or
+// this package, as root "".
+func (s *sheet) pkgFor(p string) (string, *brand.Config, error) {
+	if s.pkgs == nil {
+		s.pkgs = map[string]*brand.Config{}
+	}
+	for dir := path.Dir(p); dir != "." && dir != "/"; dir = path.Dir(dir) {
+		c, ok := s.pkgs[dir]
+		if !ok {
+			fp := filepath.Join(s.b.Dir, filepath.FromSlash(dir))
+			if _, err := os.Stat(filepath.Join(fp, brand.ConfigFile)); err == nil {
+				if c, err = brand.ReadConfig(fp); err != nil {
+					return "", nil, fmt.Errorf("%s: %w", dir, err)
+				}
+			}
+			s.pkgs[dir] = c
+		}
+		if c != nil {
+			return dir, c, nil
+		}
+	}
+	return "", &s.b.Config, nil
+}
+
+// skipAsset applies the asset rule to a file, relative to the package it
+// belongs to. A vendored base shows only what its own install list ships.
+func (s *sheet) skipAsset(p string) (bool, error) {
+	root, c, err := s.pkgFor(p)
+	if err != nil {
+		return false, err
+	}
+	if root != "" {
+		p = strings.TrimPrefix(p, root+"/")
+		installed := false
+		for _, e := range c.Install {
+			e = path.Clean(filepath.ToSlash(e))
+			if e == "." || p == e || strings.HasPrefix(p, e+"/") {
+				installed = true
+			}
+		}
+		if !installed {
+			return true, nil
+		}
+	}
 	base := path.Base(p)
 	if strings.HasPrefix(base, ".") || strings.HasSuffix(base, ".tokens.json") || strings.HasSuffix(base, ".resolver.json") ||
 		strings.EqualFold(path.Ext(base), ".md") || p == c.Readme.File || p == brand.ConfigFile {
-		return true
+		return true, nil
 	}
 	if strings.HasPrefix(p, strings.TrimSuffix(c.Readme.Assets, "/")+"/") {
-		return true
+		return true, nil
 	}
 	out := func(f string) string { return pathJoin(c.Out, f) }
-	return slices.Contains([]string{out(c.TokensCSS.File), out(c.BrandCSS.File), out(c.DaisyUI.ThemesCSS), out(c.DaisyUI.PluginCSS), out(c.Lint)}, p)
+	return slices.Contains([]string{out(c.TokensCSS.File), out(c.BrandCSS.File), out(c.DaisyUI.ThemesCSS), out(c.DaisyUI.PluginCSS), out(c.Lint)}, p), nil
 }
 
 // assetDirs lists the install files the Brand assets section shows.
@@ -88,14 +138,20 @@ func (s *sheet) assetDirs() ([]*assetDir, error) {
 				}
 				return nil
 			}
-			if !d.Type().IsRegular() || seen[p] || s.skipAsset(p) {
+			if !d.Type().IsRegular() || seen[p] {
 				return nil
+			}
+			if skip, err := s.skipAsset(p); err != nil || skip {
+				return err
 			}
 			seen[p] = true
 			dir := path.Dir(p)
 			ad := byDir[dir]
 			if ad == nil {
 				ad = &assetDir{dir: dir}
+				if root, c, _ := s.pkgFor(p); root != "" {
+					ad.from = c.Name
+				}
 				byDir[dir] = ad
 				dirs = append(dirs, ad)
 			}
@@ -133,6 +189,8 @@ type preview struct {
 	data   []byte
 	mime   string
 	w, h   float64
+	fullW  float64 // the largest raster in the group, for the use line
+	fullH  float64
 	opaque bool
 	ink    float64 // mean relative luminance of the drawn pixels or colours
 	inked  bool
@@ -141,7 +199,11 @@ type preview struct {
 var hexColourRe = regexp.MustCompile(`(?i)(?:fill|stroke|stop-color|color)\s*[:=]\s*"?\s*(#[0-9a-f]{6}|#[0-9a-f]{3})\b`)
 
 func (s *sheet) preview(g *assetGroup) (*preview, error) {
-	var best *preview
+	// Rasters: decode each, keep the smallest that covers the thumbnail at
+	// 2x (for high-density screens), else the largest; the use line gives
+	// the largest size.
+	var rasters []*preview
+	var imgs []image.Image
 	for _, f := range g.files {
 		ext := strings.ToLower(path.Ext(f))
 		switch ext {
@@ -176,41 +238,107 @@ func (s *sheet) preview(g *assetGroup) (*preview, error) {
 			if err != nil {
 				continue
 			}
-			b := img.Bounds()
-			if best != nil && best.w*best.h >= float64(b.Dx()*b.Dy()) {
-				continue
-			}
 			mime := "image/png"
 			if ext == ".gif" {
 				mime = "image/gif"
 			} else if ext != ".png" {
 				mime = "image/jpeg"
 			}
-			pv := &preview{file: f, data: data, mime: mime, w: float64(b.Dx()), h: float64(b.Dy()), opaque: true}
-			sum, wsum := 0.0, 0.0
-			for y := b.Min.Y; y < b.Max.Y; y++ {
-				for x := b.Min.X; x < b.Max.X; x++ {
-					r, g, bl, a := img.At(x, y).RGBA()
-					if a < 0xffff {
-						pv.opaque = false
-					}
-					if a == 0 {
-						continue
-					}
-					af := float64(a) / 0xffff
-					// un-premultiply
-					c := color.RGB{R: float64(r) / float64(a), G: float64(g) / float64(a), B: float64(bl) / float64(a), A: 1}
-					sum += c.Luminance() * af
-					wsum += af
-				}
-			}
-			if wsum > 0 {
-				pv.ink, pv.inked = sum/wsum, true
-			}
-			best = pv
+			b := img.Bounds()
+			rasters = append(rasters, &preview{file: f, data: data, mime: mime, w: float64(b.Dx()), h: float64(b.Dy())})
+			imgs = append(imgs, img)
 		}
 	}
-	return best, nil
+	if len(rasters) == 0 {
+		return nil, nil
+	}
+	pick, largest := -1, 0
+	for i, r := range rasters {
+		if r.w*r.h > rasters[largest].w*rasters[largest].h {
+			largest = i
+		}
+		dw, dh := thumbDisplay(r.w, r.h)
+		if r.w >= 2*dw && r.h >= 2*dh && (pick < 0 || r.w*r.h < rasters[pick].w*rasters[pick].h) {
+			pick = i
+		}
+	}
+	if pick < 0 {
+		pick = largest
+	}
+	pv, img := rasters[pick], imgs[pick]
+	pv.fullW, pv.fullH = rasters[largest].w, rasters[largest].h
+	b := img.Bounds()
+	pv.opaque = true
+	sum, wsum := 0.0, 0.0
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			r, g, bl, a := img.At(x, y).RGBA()
+			if a < 0xffff {
+				pv.opaque = false
+			}
+			if a == 0 {
+				continue
+			}
+			af := float64(a) / 0xffff
+			// un-premultiply
+			c := color.RGB{R: float64(r) / float64(a), G: float64(g) / float64(a), B: float64(bl) / float64(a), A: 1}
+			sum += c.Luminance() * af
+			wsum += af
+		}
+	}
+	if wsum > 0 {
+		pv.ink, pv.inked = sum/wsum, true
+	}
+	if !pv.opaque {
+		// Embedded in a thumbnail: no more pixels than the thumbnail shows at 2x.
+		dw, dh := thumbDisplay(pv.w, pv.h)
+		if k := int(min(pv.w/(2*dw), pv.h/(2*dh))); k >= 2 {
+			var buf bytes.Buffer
+			if err := png.Encode(&buf, shrink(img, k)); err != nil {
+				return nil, err
+			}
+			pv.data, pv.mime = buf.Bytes(), "image/png"
+		}
+	}
+	return pv, nil
+}
+
+// thumbDisplay is the size an image is drawn at in its thumbnail.
+func thumbDisplay(w, h float64) (float64, float64) {
+	sc := min(thumbW/w, thumbH/h, 8)
+	return w * sc, h * sc
+}
+
+// shrink averages each k×k block of img into one pixel.
+func shrink(img image.Image, k int) image.Image {
+	b := img.Bounds()
+	out := image.NewNRGBA(image.Rect(0, 0, b.Dx()/k, b.Dy()/k))
+	for oy := 0; oy < out.Rect.Dy(); oy++ {
+		for ox := 0; ox < out.Rect.Dx(); ox++ {
+			var r, g, bl, a uint64
+			for y := 0; y < k; y++ {
+				for x := 0; x < k; x++ {
+					pr, pg, pb, pa := img.At(b.Min.X+ox*k+x, b.Min.Y+oy*k+y).RGBA()
+					r, g, bl, a = r+uint64(pr), g+uint64(pg), bl+uint64(pb), a+uint64(pa)
+				}
+			}
+			px := stdcolor.NRGBA{}
+			if a > 0 {
+				// premultiplied sums → straight alpha
+				px = stdcolor.NRGBA{R: uint8(r * 0xff / a), G: uint8(g * 0xff / a), B: uint8(bl * 0xff / a), A: uint8(a / uint64(k*k) >> 8)}
+			}
+			out.SetNRGBA(ox, oy, px)
+		}
+	}
+	return out
+}
+
+// thumbName is a preview thumbnail's file name: a short hash of the asset's
+// path, so two paths never share one and any path gives a name the sheet
+// cleanup recognises.
+func thumbName(file string) string {
+	sum := sha256.Sum256([]byte(file))
+	return "asset-" + hex.EncodeToString(sum[:4]) + ".svg"
 }
 
 // groundFor picks the theme an image with transparency is shown on.
@@ -250,9 +378,8 @@ func (s *sheet) previewCell(g *assetGroup, pv *preview) (string, *brand.Theme) {
 		sc = min(sc, 1)
 		return fmt.Sprintf(`<img src="%s" width="%s" alt="">`, s.rel(pv.file), brand.Num(float64(int(pv.w*sc+0.5)))), nil
 	}
-	sc = min(sc, 8)
 	th := s.groundFor(g, pv)
-	w, h := pv.w*sc, pv.h*sc
+	w, h := thumbDisplay(pv.w, pv.h)
 	W, H := w+2*thumbPad, h+2*thumbPad
 	render := ""
 	if pv.mime != "image/svg+xml" {
@@ -263,8 +390,7 @@ func (s *sheet) previewCell(g *assetGroup, pv *preview) (string, *brand.Theme) {
 	fmt.Fprintf(&b, `<rect width="%s" height="%s" rx="6" fill="%s"/>`, brand.Num(W), brand.Num(H), s.roleHex(th, "base-100", "#ffffff"))
 	fmt.Fprintf(&b, `<image x="%s" y="%s" width="%s" height="%s"%s href="%s"/></svg>`+"\n",
 		brand.Num(thumbPad), brand.Num(thumbPad), brand.Num(w), brand.Num(h), render, dataURI(pv.mime, pv.data))
-	slug := strings.ReplaceAll(strings.TrimSuffix(pv.file, path.Ext(pv.file)), "/", "-")
-	p := s.asset("asset-"+slug+".svg", b.Bytes())
+	p := s.asset(thumbName(pv.file), b.Bytes())
 	return fmt.Sprintf(`<img src="%s" alt="">`, s.rel(p)), th
 }
 
@@ -285,7 +411,7 @@ func (s *sheet) assetUse(g *assetGroup, pv *preview, ground *brand.Theme) string
 	}
 	size := ""
 	if pv != nil && pv.mime != "image/svg+xml" {
-		size = fmt.Sprintf(", %d×%d", int(pv.w), int(pv.h))
+		size = fmt.Sprintf(", %d×%d", int(pv.fullW), int(pv.fullH))
 	}
 	on := ""
 	if ground != nil {
@@ -296,7 +422,7 @@ func (s *sheet) assetUse(g *assetGroup, pv *preview, ground *brand.Theme) string
 			return fmt.Sprintf("the %s lockup, as under Logo and clear space%s", th.Config.Label, on)
 		}
 	}
-	if slices.Contains(g.files, s.rules.Mark) {
+	if slices.Contains(g.files, s.rules.Mark) || s.markVariant(g) {
 		return "the mark on its own" + on
 	}
 	name := path.Base(g.files[0])
@@ -353,8 +479,18 @@ func (s *sheet) assetUse(g *assetGroup, pv *preview, ground *brand.Theme) string
 			noun = "preview image"
 		case strings.Contains(dir, "lockup") || strings.Contains(dir, "logo"):
 			noun = "lockup"
-		case strings.Contains(dir, "hero") || strings.Contains(dir, "banner"):
+			for _, kind := range []string{"stacked", "horizontal", "vertical"} {
+				if slices.Contains(strings.Split(strings.ToLower(g.stem), "-"), kind) {
+					noun = kind + " lockup"
+				}
+			}
+			if strings.Contains(strings.ToLower(g.stem), "word") {
+				noun = "wordmark"
+			}
+		case strings.Contains(dir, "hero"):
 			noun = "hero image"
+		case strings.Contains(dir, "banner") || strings.Contains(strings.ToLower(g.stem), "banner"):
+			noun = "banner"
 		case strings.Contains(dir, "social"):
 			noun = "social card"
 		case strings.Contains(dir, "avatar"):
@@ -370,6 +506,19 @@ func (s *sheet) assetUse(g *assetGroup, pv *preview, ground *brand.Theme) string
 		return "licence"
 	}
 	return "file"
+}
+
+// markVariant reports whether a group is the mark in another colour: in the
+// mark's folder, with the mark's name but a different last part
+// (mapleset-leaf-butter beside the mark mapleset-leaf-plum).
+func (s *sheet) markVariant(g *assetGroup) bool {
+	m := s.rules.Mark
+	if m == "" || path.Dir(m) != path.Dir(g.files[0]) {
+		return false
+	}
+	stem := scaleSuffixRe.ReplaceAllString(strings.TrimSuffix(path.Base(m), path.Ext(m)), "")
+	i, j := strings.LastIndex(stem, "-"), strings.LastIndex(g.stem, "-")
+	return i > 0 && j > 0 && stem[:i] == g.stem[:j]
 }
 
 // letters is s lower-cased with only its letters and digits.
@@ -419,7 +568,11 @@ func (s *sheet) assets() error {
 	}
 	s.p("%s\n\n", AssetRule)
 	for _, ad := range dirs {
-		s.p("### `%s`\n\n| Preview | Files | Use |\n|---|---|---|\n", ad.dir)
+		s.p("### `%s`\n\n", ad.dir)
+		if ad.from != "" {
+			s.p("From %s, vendored in this package: its own `install` files only.\n\n", ad.from)
+		}
+		s.p("| Preview | Files | Use |\n|---|---|---|\n")
 		var head string
 		for _, g := range ad.groups {
 			pv, err := s.preview(g)

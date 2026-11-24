@@ -29,6 +29,7 @@ type sheet struct {
 	rules *brand.Rules
 	files []File
 	w     bytes.Buffer
+	pkgs  map[string]*brand.Config // vendored brand packages by folder; nil: none there
 }
 
 // rel turns a package path into a path relative to the README.
