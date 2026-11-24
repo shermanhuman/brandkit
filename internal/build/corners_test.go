@@ -366,18 +366,6 @@ func checkCorners(t *testing.T, dir string, fc color.RGBA, radius map[string]flo
 		if err != nil {
 			t.Fatal(err)
 		}
-		if d := os.Getenv("BRANDKIT_SHOT_DIR"); d != "" { // DEBUG: temporary
-			os.MkdirAll(d, 0o755)
-			os.WriteFile(filepath.Join(d, strings.ReplaceAll(t.Name(), "/", "_")+"-"+time.Now().Format("150405.000000")+".png"), buf, 0o644)
-			dbg, _ := chromedp.Run(ctx, chromedp.Evaluate[[]string](`(() => { const e = document.getElementById("btn"); const s = getComputedStyle(e); const a = getComputedStyle(e, "::after"); return [navigator.userAgent, String(devicePixelRatio), innerWidth+"x"+innerHeight, s.borderColor, s.borderWidth, s.backgroundColor, s.color, a.borderColor, a.borderWidth, a.content, String(e.matches(":hover")), String(e.matches(":focus-visible")), String(matchMedia("(hover: hover)").matches), String(matchMedia("(prefers-color-scheme: dark)").matches), String(matchMedia("(prefers-reduced-motion: reduce)").matches), String(matchMedia("(prefers-contrast: more)").matches), String(matchMedia("(forced-colors: active)").matches), JSON.stringify(e.getBoundingClientRect())]; })()`))
-			t.Logf("DEBUG %q", dbg)
-			if im, err := png.Decode(bytes.NewReader(buf)); err == nil {
-				t.Logf("DEBUG btn left %v centre %v", im.At(40, 60), im.At(100, 60))
-			}
-			if out, err := exec.Command("fc-match", "sans-serif").CombinedOutput(); err == nil {
-				t.Logf("DEBUG fc-match %s", out)
-			}
-		}
 		return img
 	}
 	at := func(img image.Image, x, y int) color.RGBA {
