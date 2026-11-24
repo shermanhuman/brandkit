@@ -27,6 +27,14 @@ jobs:
         run: go vet ./...
       - name: Go tests
         run: go test ./...
+        env:
+          BRANDKIT_SHOT_DIR: ${{ runner.temp }}/shots # DEBUG: temporary
+      - name: Upload screenshots # DEBUG: temporary
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: corner-shots
+          path: ${{ runner.temp }}/shots
       - name: Build every target
         run: |
           for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
