@@ -164,7 +164,7 @@ A brand can put every chromatic colour on one path around the OKLCH hue wheel, i
 - `minChroma` (optional, default 0.03): only colour tokens with an OKLCH chroma above it count, so neutrals are skipped.
 - `exceptions`: tokens kept off the path on purpose, each with a `reason`. An exception on an alias (a role such as `color.error`) covers the token it points at in each theme.
 
-`check` warns, and doesn't fail, for each chromatic colour token whose hue is more than the tolerance from every stop and isn't an exception, naming the token, its hue and the nearest stop. Aliases are checked through the token they point at; tokens written in OKLCH use their authored hue. It errors on an arc it can't use: a step of 0 or 180° or more, a start outside 0–360, more stops than fit in a turn, a tolerance of half the step or more, or an exception that isn't a colour token or has no reason.
+`check` warns, and doesn't fail, for each chromatic colour token whose hue is more than the tolerance from every stop and isn't an exception, naming the token, its hue and the nearest stop: once, without a theme, when every theme places it the same, and per theme otherwise. Aliases are checked through the token they point at; tokens written in OKLCH use their authored hue. It errors on an arc it can't use: a step of 0 or 180° or more, a start outside 0–360, more stops than fit in a turn, a tolerance of half the step or more, or an exception that isn't a colour token or has no reason.
 
 The README sheet's colour section lists the stops, which tokens sit on each per theme, the free stops, the exceptions and anything off the arc. To add a colour, pick the free stop nearest the hue it needs.
 

@@ -364,7 +364,7 @@ func (s *sheet) arc() error {
 		note func(ArcPlace) string
 	}{
 		{"Exceptions", func(p ArcPlace) bool { return !p.On && p.Exception != "" }, func(p ArcPlace) string { return ": " + strings.ReplaceAll(p.Exception, "|", "\\|") }},
-		{"**Off the arc**", func(p ArcPlace) bool { return !p.On && p.Exception == "" }, func(p ArcPlace) string { return fmt.Sprintf(", %.0f° from stop %d", p.Off, p.Stop) }},
+		{"**Off the arc**", func(p ArcPlace) bool { return !p.On && p.Exception == "" }, func(p ArcPlace) string { return fmt.Sprintf(", %.1f° from stop %d", p.Off, p.Stop) }},
 	}
 	for _, r := range rows {
 		cells := make([]string, len(s.b.Themes))

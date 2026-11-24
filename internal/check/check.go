@@ -426,17 +426,44 @@ func (c *checker) arc(r *brand.Rules) {
 	if bad {
 		return
 	}
+	// A token off the arc the same way in every theme (a shared
+	// primitive) is reported once, not once per theme.
+	type off struct {
+		theme string
+		p     build.ArcPlace
+	}
+	var order []string
+	offs := map[string][]off{}
+	themes := 0
 	for _, th := range c.b.Themes {
 		places, err := build.ArcPlaces(th, a)
 		if err != nil {
 			c.add("arc", "error", th.Name, "%v", err)
 			continue
 		}
+		themes++
 		for _, p := range places {
 			if p.On || p.Exception != "" {
 				continue
 			}
-			c.add("arc", "warning", th.Name, "%s (hue %.1f°) is off the brand arc: the nearest stop is %d at %.1f°, %.1f° away (tolerance %s°). Move it to a free stop or declare it an exception with a reason",
+			if offs[p.Token] == nil {
+				order = append(order, p.Token)
+			}
+			offs[p.Token] = append(offs[p.Token], off{th.Name, p})
+		}
+	}
+	for _, tok := range order {
+		list := offs[tok]
+		same := len(c.b.Themes) > 1 && len(list) == themes
+		for _, o := range list[1:] {
+			same = same && math.Abs(o.p.Hue-list[0].p.Hue) < 0.05 && o.p.Stop == list[0].p.Stop
+		}
+		if same {
+			list = []off{{"", list[0].p}}
+		}
+		for _, o := range list {
+			p := o.p
+			c.add("arc", "warning", o.theme, "%s (hue %.1f°) is off the brand arc: the nearest stop is %d at %.1f°, %.1f° away (tolerance %s°). Move it to a free stop or declare it an exception with a reason",
 				p.Token, p.Hue, p.Stop, a.StopHue(p.Stop), p.Off, brand.Num(a.Tol()))
 		}
 	}

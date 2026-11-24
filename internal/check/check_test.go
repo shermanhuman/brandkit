@@ -268,19 +268,23 @@ func TestArc(t *testing.T) {
 		}
 		tok, _, _ := strings.Cut(f.Message, " ")
 		got[tok]++
+		if f.Theme == "" {
+			got[tok+" (every theme)"]++
+		}
 		if tok == "palette.green-300" && !strings.Contains(f.Message, "palette.green-300 (hue 150.0°) is off the brand arc: the nearest stop is 6 at 163.8°, 13.8° away (tolerance 8°)") {
 			t.Errorf("message: %s", f.Message)
 		}
 	}
-	// Off the arc in both themes (the palette is shared).
+	// Off the arc the same way in both themes (the palette is shared):
+	// one warning, for every theme.
 	for _, tok := range []string{"palette.green-300", "palette.green-800", "palette.teal-300", "palette.blue-700"} {
-		if got[tok] != 2 {
-			t.Errorf("%s: %d warnings, want one per theme", tok, got[tok])
+		if got[tok] != 1 || got[tok+" (every theme)"] != 1 {
+			t.Errorf("%s: %d warnings (%d for every theme), want one for every theme", tok, got[tok], got[tok+" (every theme)"])
 		}
 	}
 	// An exception on an alias covers the token it points at in that
 	// theme: color.accent is coral-300 at night and coral-700 by day.
-	if got["palette.coral-300"] != 1 {
+	if got["palette.coral-300"] != 1 || got["palette.coral-300 (every theme)"] != 0 {
 		t.Errorf("palette.coral-300: %d warnings, want one (day, where color.accent isn't it)", got["palette.coral-300"])
 	}
 	// On a stop, excepted, neutral, or an alias.
@@ -358,8 +362,8 @@ func TestBreakdownArc(t *testing.T) {
 		t.Errorf("Breakdown's colours are on the arc or declared, got:\n%v", fs)
 	}
 	fs := run("")
-	if len(fs) != 2 { // one per theme
-		t.Fatalf("want magenta off the arc in each theme, got:\n%v", fs)
+	if len(fs) != 1 || fs[0].Theme != "" { // the same in both themes: once
+		t.Fatalf("want magenta off the arc once, for every theme, got:\n%v", fs)
 	}
 	for _, f := range fs {
 		if f.Severity != "warning" || !strings.HasPrefix(f.Message, "bd.magenta (hue 359.2°) is off the brand arc: the nearest stop is 2 at 338.6°, 20.6° away") {

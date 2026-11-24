@@ -359,7 +359,7 @@ func TestSheetArc(t *testing.T) {
 		"| 1 | 22.3° | `palette.coral-700` 30°<br>`palette.red-300` 22°<br>`palette.red-700` 25° |",
 		"| 2 | 338.6° | free | free |",
 		"| Exceptions | | `palette.amber-200` 90°: kept yellow \\| for warnings |",
-		"| **Off the arc** | | `palette.teal-300` 190°, 18° from stop 5<br>",
+		"| **Off the arc** | | `palette.teal-300` 190°, 17.5° from stop 5<br>",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the arc section lacks %q:\n%s", want, out)
