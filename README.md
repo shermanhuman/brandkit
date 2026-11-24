@@ -2,7 +2,7 @@
 
 brandkit turns a brand defined as [DTCG 2025.10](https://www.designtokens.org/TR/2025.10/) design tokens into the files a web project uses. It also checks the brand, lints UI code against it, and captures rendered pages for review.
 
-- **`build`** writes `tokens.css`, `brand.css`, both DaisyUI 5 theme forms, `lint.json` and a GitHub README brand sheet (swatch SVGs and PNG specimens, day and night).
+- **`build`** writes `tokens.css`, `brand.css`, both DaisyUI 5 theme forms, `lint.json` and a GitHub README brand sheet (swatch SVGs, PNG specimens and SVG examples, every theme side by side or one after the other, labelled).
 - **`check`** checks the schema, the contrast (WCAG 2.x) of every declared colour pair and of every DaisyUI colour under its `-content` colour in each theme, and the brand rules, and fails on any token value left as `"TODO"`.
 - **`lint`** runs rules R1–R9 on CSS, HTML, HEEx, Elixir `~H` and Go `html/template` sources and on compiled CSS. It also runs as an edit-time agent hook.
 - **`capture`** takes screenshots at 375/768/1280/1920 with axe-core, computed contrast and overflow per width. It works from a URL or from a browser an e2e script is driving.
@@ -40,7 +40,7 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
 | `name`, `description`, `repo` | | shown in the README; `repo` (owner/name) goes in its install section |
 | `resolver` | required | the resolver document |
 | `modifier` | `theme` | the resolver modifier whose contexts are the themes |
-| `themes.<context>` | required | `daisyui` (theme name), `colorScheme` (dark/light), `default` (exactly one), `prefersDark`, `selector` (for tokens.css; default `[data-theme="<daisyui>"]`. Other themes' blocks hold only what differs, so unless the default theme's selector is `:root`, its block also lists every other theme's selector), `label`, `github` (dark/light: which GitHub scheme shows it in the README) |
+| `themes.<context>` | required | `daisyui` (theme name), `colorScheme` (dark/light), `default` (exactly one), `prefersDark`, `selector` (for tokens.css; default `[data-theme="<daisyui>"]`. Other themes' blocks hold only what differs, so unless the default theme's selector is `:root`, its block also lists every other theme's selector), `label`, `github` (no longer used: the README sheet shows every theme) |
 | `out` | `export` | folder for generated files |
 | `tokensCss.file` / `.include` / `.template` / `.header` | `ui/tokens.css`, `["type:color"]` | `include` takes path prefixes or `type:<name>`. `template` is a Go `text/template` that writes the whole file, so a legacy file can be reproduced byte for byte (fields: `.Brand`, `.GeneratedBy`, `.Default`, `.Themes`, each with `.Name .Selector .ColorScheme .Default .Decls .Changed`, and `.Value "<name>"`) |
 | `brandCss.file` | `ui/brand.css` | every token not in tokens.css (type, spacing, radius, motion) |
@@ -52,6 +52,10 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
 | `readme.file` / `.assets` | `README.md`, `<out>/sheet` | |
 | `fonts[]` | | `family`, `css` (the `@font-face` file), `license` |
 | `install` | | extra files or folders `brandkit install` vendors (tokens, fonts, assets). The generated files, `brandkit.json`, the README and its sheet folder always go. Every path must stay inside the package |
+
+**The README brand sheet** shows every picture in every theme, labelled: the clear space, spacing, radius and icon examples as one SVG each with a panel per theme, and the type and component specimens as one PNG per theme, 880 pixels wide so text shows at true size in GitHub's README column. Spacing steps are drawn at true size as the gap between two blocks; each radius on a button, a field and a card. For a brand whose icon set is Lucide, it draws twelve common icons from the Lucide release vendored in [`internal/build/lucide`](internal/build/lucide/README.md); other sets are named only.
+
+Its **Brand assets** section lists every file under the `install` entries except token files (`*.tokens.json`, `*.resolver.json`), Markdown, dotfiles, the README, its sheet folder and the files brandkit generates. Files are grouped by folder in `install` order; files whose names differ only in extension or a `-1x`/`-2x`/`@2x` scale suffix share a row. Each row has the file links and a one-line use (lockup for which theme, favicon, manifest icon, font file and the stylesheet that loads it, licence, and so on). SVG, PNG, JPEG and GIF files get a preview: opaque images as they are, transparent ones as a thumbnail in the sheet folder on the ground of the theme they belong to (the theme a `lockup` names, otherwise the theme whose `base-100` contrasts most with the image's colours). A `head.html` of 2 KB or less is printed below its folder's table.
 
 **Token extensions** (in a token file's root `$extensions`, merged across files like tokens):
 

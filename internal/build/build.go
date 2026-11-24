@@ -131,7 +131,7 @@ func Write(b *brand.Brand, opts Options) ([]string, error) {
 }
 
 // sheetNameRe matches the names brandkit gives sheet files.
-var sheetNameRe = regexp.MustCompile(`^(?:sw-[0-9a-f]{6,8}\.svg|(?:clearspace|scale)-[\w-]+\.svg|(?:type|components)-[\w-]+\.png)$`)
+var sheetNameRe = regexp.MustCompile(`^(?:sw-[0-9a-f]{6,8}\.svg|(?:clearspace|scale|spacing|radius|icons)(?:-[\w-]+)?\.svg|asset-[\w.-]+\.svg|(?:type|components)-[\w-]+\.png)$`)
 
 func pathJoin(a, b string) string {
 	if a == "" || a == "." {

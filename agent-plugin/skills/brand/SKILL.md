@@ -70,7 +70,7 @@ If the package replaces an older token file that projects still read, generate t
 
 ## 5. Approve the sheet
 
-Push the branch so the host renders the generated `README.md`, and send the user its link with one line per section: logos and lockups per theme, clear space, colour roles with contrast, type, spacing and radius, icons, component examples, do and don't, install. Ask them to look at it in both the host's light and dark modes, since the sheet swaps its images by colour scheme.
+Push the branch so the host renders the generated `README.md`, and send the user its link with one line per section: logos and lockups per theme, clear space, colour roles with contrast, type, spacing and radius, icons, component examples, brand assets, do and don't, install. Every picture shows each theme, labelled, so one look covers both.
 
 Their changes go back through step 4. When they approve, the release (a tag that projects pin with `brandkit install owner/repo@tag`) follows the host's release rules; tagging is usually the user's.
 

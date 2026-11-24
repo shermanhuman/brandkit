@@ -18,8 +18,10 @@ import (
 	"github.com/shermanhuman/brandkit/internal/dtcg"
 )
 
-// SpecimenWidth is the CSS width the PNG specimens are drawn at (at 2x).
-const SpecimenWidth = 800
+// SpecimenWidth is the CSS width the PNG specimens are drawn at (at 2x),
+// and the width the README shows them at: about GitHub's README column,
+// so the type is shown at its true size.
+const SpecimenWidth = 880
 
 // Pages returns the HTML pages the PNG specimens are drawn from, by file
 // name (type-<theme>.html, components-<theme>.html). Fonts load from /pkg/.
@@ -81,7 +83,7 @@ func pageHead(b *brand.Brand, th *brand.Theme, rules *brand.Rules) ([]byte, erro
 	fmt.Fprintf(&w, `* { box-sizing: border-box; }
 html, body { margin: 0; }
 body { width: %dpx; padding: 8px 0; background: var(--color-base-100); color: var(--color-base-content); font-family: %s; font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
-.meta { font-family: %s; font-size: 12px; line-height: 1.4; opacity: 0.8; margin-bottom: 4px; }
+.meta { font-family: %s; font-size: 13px; line-height: 1.4; opacity: 0.85; margin-bottom: 4px; }
 .row { padding: 14px 24px; border-bottom: var(--border) solid var(--color-base-300); }
 .row:last-child { border-bottom: 0; }
 .wrap { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
