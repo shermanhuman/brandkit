@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "brand": "Fixture Base",
+  "fonts": [
+    "Atkinson Hyperlegible",
+    "Fira Mono",
+    "monospace",
+    "sans-serif",
+    "system-ui",
+    "ui-monospace"
+  ],
+  "shadows": "none",
+  "iconSet": "lucide",
+  "iconPrefix": "lucide-",
+  "opacityMin": 70
+}

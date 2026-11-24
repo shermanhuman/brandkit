@@ -5,6 +5,7 @@ package check
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	"github.com/shermanhuman/brandkit/internal/build"
 	"github.com/shermanhuman/brandkit/internal/color"
 	"github.com/shermanhuman/brandkit/internal/dtcg"
+	"github.com/shermanhuman/brandkit/internal/lint"
 )
 
 // Finding is one problem.
@@ -68,6 +70,8 @@ func Brand(b *brand.Brand) []Finding {
 	c.fonts(rules)
 	c.icons(rules)
 	c.roles(rules)
+	c.corners(rules)
+	c.arc(rules)
 	return c.out
 }
 
@@ -89,11 +93,12 @@ func Errors(fs []Finding) int {
 }
 
 func (c *checker) contrast(r *brand.Rules) {
-	if len(r.Contrast) == 0 {
+	pairs := build.ContrastPairs(c.b, r)
+	if len(pairs) == 0 {
 		c.add("contrast", "warning", "", "the brand declares no contrast pairs")
 	}
 	for _, th := range c.b.Themes {
-		for _, p := range r.Contrast {
+		for _, p := range pairs {
 			if p.Min < 1 || p.Min > 21 {
 				c.add("contrast", "error", th.Name, "%s on %s: minimum %v isn't a WCAG ratio (1 to 21)", p.FG, p.BG, p.Min)
 				continue
@@ -104,7 +109,8 @@ func (c *checker) contrast(r *brand.Rules) {
 				continue
 			}
 			if ratio+1e-9 < p.Min {
-				c.add("contrast", "error", th.Name, "%s on %s is %.2f:1, below %s:1 (%s)", p.FG, p.BG, ratio, brand.Num(p.Min), p.Use)
+				c.add("contrast", "error", th.Name, "%s on %s is %.2f:1, below %s:1 (%s)",
+					build.PairName(th, p.FG), build.PairName(th, p.BG), ratio, brand.Num(p.Min), p.Use)
 			}
 		}
 	}
@@ -333,6 +339,132 @@ func (c *checker) roles(r *brand.Rules) {
 			if t := th.Tokens.Get(ro.Token); t == nil || t.Type != "color" {
 				c.add("roles", "error", th.Name, "role %s isn't a colour token", ro.Token)
 			}
+		}
+	}
+}
+
+// corners checks the corner style: pixel steps of whole pixels, small no
+// larger than box, and a focus colour token for the ring they redraw.
+func (c *checker) corners(r *brand.Rules) {
+	k := r.Corners
+	if k == nil {
+		return
+	}
+	if k.Style != "pixel" {
+		c.add("corners", "error", "", "corners style is %q; the only style is \"pixel\"", k.Style)
+		return
+	}
+	for _, s := range []struct {
+		name string
+		v    float64
+	}{{"small", k.Small}, {"box", k.Box}} {
+		if s.v < 1 || s.v > 16 || s.v != float64(int(s.v)) {
+			c.add("corners", "error", "", "corners %s is %v; give the step in whole pixels, 1 to 16", s.name, s.v)
+		}
+	}
+	if k.Small > k.Box {
+		c.add("corners", "warning", "", "corners small (%v) is larger than box (%v); small controls usually take the smaller step", k.Small, k.Box)
+	}
+	if _, _, ok := k.ScopeAttr(); !ok {
+		c.add("corners", "error", "", "corners scope %q isn't an attribute selector (%s) or a class (.marketing)", k.Scope, brand.DefaultCornerScope)
+	}
+	for _, g := range k.Pages {
+		if err := lint.ValidGlob(g); err != nil {
+			c.add("corners", "error", "", "corners pages: %v", err)
+		}
+	}
+	if k.Focus == "" {
+		c.add("corners", "warning", "", "corners names no focus colour token; the stepped focus ring falls back to base-content")
+		return
+	}
+	for _, th := range c.b.Themes {
+		if t := th.Tokens.Get(k.Focus); t == nil || t.Type != "color" {
+			c.add("corners", "error", th.Name, "corners focus %s isn't a colour token", k.Focus)
+		}
+	}
+}
+
+// arc checks the brand arc: a usable path, exceptions that name colour
+// tokens with a reason, then a warning for each chromatic colour whose
+// hue is off every stop and isn't a declared exception.
+func (c *checker) arc(r *brand.Rules) {
+	a := r.Arc
+	if a == nil {
+		return
+	}
+	bad := false
+	if a.Step == 0 || math.Abs(a.Step) >= 180 {
+		c.add("arc", "error", "", "arc step is %v; give the hue step in degrees, more than 0 and less than 180 either way (negative runs down the wheel)", a.Step)
+		bad = true
+	}
+	if a.Start < 0 || a.Start >= 360 {
+		c.add("arc", "error", "", "arc start is %v; give a hue from 0 to 360", a.Start)
+		bad = true
+	}
+	if a.Stops < 0 || a.Step != 0 && float64(a.Stops)*math.Abs(a.Step) > 360+1e-9 {
+		c.add("arc", "error", "", "arc stops is %d; the stops must fit in one turn of the wheel", a.Stops)
+		bad = true
+	}
+	if a.Tolerance < 0 || a.Step != 0 && a.Tol() >= math.Abs(a.Step)/2 {
+		c.add("arc", "error", "", "arc tolerance is %v; give degrees, more than 0 and less than half the step", a.Tol())
+		bad = true
+	}
+	if a.MinChroma < 0 || a.MinChroma >= 0.4 {
+		c.add("arc", "error", "", "arc minChroma is %v; give an OKLCH chroma from 0 to 0.4 (neutrals sit below about 0.03)", a.MinChroma)
+		bad = true
+	}
+	for _, e := range a.Exceptions {
+		if strings.TrimSpace(e.Reason) == "" {
+			c.add("arc", "error", "", "arc exception %s has no reason; say why it sits off the arc", e.Token)
+		}
+		for _, th := range c.b.Themes {
+			if t := th.Tokens.Get(e.Token); t == nil || t.Type != "color" {
+				c.add("arc", "error", th.Name, "arc exception %s isn't a colour token", e.Token)
+			}
+		}
+	}
+	if bad {
+		return
+	}
+	// A token off the arc the same way in every theme (a shared
+	// primitive) is reported once, not once per theme.
+	type off struct {
+		theme string
+		p     build.ArcPlace
+	}
+	var order []string
+	offs := map[string][]off{}
+	themes := 0
+	for _, th := range c.b.Themes {
+		places, err := build.ArcPlaces(th, a)
+		if err != nil {
+			c.add("arc", "error", th.Name, "%v", err)
+			continue
+		}
+		themes++
+		for _, p := range places {
+			if p.On || p.Exception != "" {
+				continue
+			}
+			if offs[p.Token] == nil {
+				order = append(order, p.Token)
+			}
+			offs[p.Token] = append(offs[p.Token], off{th.Name, p})
+		}
+	}
+	for _, tok := range order {
+		list := offs[tok]
+		same := len(c.b.Themes) > 1 && len(list) == themes
+		for _, o := range list[1:] {
+			same = same && math.Abs(o.p.Hue-list[0].p.Hue) < 0.05 && o.p.Stop == list[0].p.Stop
+		}
+		if same {
+			list = []off{{"", list[0].p}}
+		}
+		for _, o := range list {
+			p := o.p
+			c.add("arc", "warning", o.theme, "%s (hue %.1f°) is off the brand arc: the nearest stop is %d at %.1f°, %.1f° away (tolerance %s°). Move it to a free stop or declare it an exception with a reason",
+				p.Token, p.Hue, p.Stop, a.StopHue(p.Stop), p.Off, brand.Num(a.Tol()))
 		}
 	}
 }

@@ -2,9 +2,9 @@
 
 brandkit turns a brand defined as [DTCG 2025.10](https://www.designtokens.org/TR/2025.10/) design tokens into the files a web project uses. It also checks the brand, lints UI code against it, and captures rendered pages for review.
 
-- **`build`** writes `tokens.css`, `brand.css`, both DaisyUI 5 theme forms, `lint.json` and a GitHub README brand sheet (swatch SVGs and PNG specimens, day and night).
-- **`check`** checks the schema, the contrast of every declared colour pair (WCAG 2.x) and the brand rules, and fails on any token value left as `"TODO"`.
-- **`lint`** runs rules R1–R9 on CSS, HTML, HEEx, Elixir `~H` and Go `html/template` sources and on compiled CSS. It also runs as an edit-time agent hook.
+- **`build`** writes `tokens.css`, `brand.css`, both DaisyUI 5 theme forms, `lint.json` and a GitHub README brand sheet (swatch SVGs, PNG specimens and SVG examples, every theme side by side or one after the other, labelled).
+- **`check`** checks the schema, the contrast (WCAG 2.x) of every declared colour pair and of every DaisyUI colour under its `-content` colour in each theme, and the brand rules, and fails on any token value left as `"TODO"`.
+- **`lint`** runs rules R1–R10 on CSS, HTML, HEEx, Elixir `~H` and Go `html/template` sources and on compiled CSS. It also runs as an edit-time agent hook.
 - **`capture`** takes screenshots at 375/768/1280/1920 with axe-core, computed contrast and overflow per width. It works from a URL or from a browser an e2e script is driving.
 - **`install` / `update`** vendor a brand's built files and its README brand sheet into a project, pinned in `brandkit.lock`. `install --check` verifies them offline.
 
@@ -40,7 +40,7 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
 | `name`, `description`, `repo` | | shown in the README; `repo` (owner/name) goes in its install section |
 | `resolver` | required | the resolver document |
 | `modifier` | `theme` | the resolver modifier whose contexts are the themes |
-| `themes.<context>` | required | `daisyui` (theme name), `colorScheme` (dark/light), `default` (exactly one), `prefersDark`, `selector` (for tokens.css; default `[data-theme="<daisyui>"]`. Other themes' blocks hold only what differs, so unless the default theme's selector is `:root`, its block also lists every other theme's selector), `label`, `github` (dark/light: which GitHub scheme shows it in the README) |
+| `themes.<context>` | required | `daisyui` (theme name), `colorScheme` (dark/light), `default` (exactly one), `prefersDark`, `selector` (for tokens.css; default `[data-theme="<daisyui>"]`. Other themes' blocks hold only what differs, so unless the default theme's selector is `:root`, its block also lists every other theme's selector), `label`, `github` (no longer used: the README sheet shows every theme) |
 | `out` | `export` | folder for generated files |
 | `tokensCss.file` / `.include` / `.template` / `.header` | `ui/tokens.css`, `["type:color"]` | `include` takes path prefixes or `type:<name>`. `template` is a Go `text/template` that writes the whole file, so a legacy file can be reproduced byte for byte (fields: `.Brand`, `.GeneratedBy`, `.Default`, `.Themes`, each with `.Name .Selector .ColorScheme .Default .Decls .Changed`, and `.Value "<name>"`) |
 | `brandCss.file` | `ui/brand.css` | every token not in tokens.css (type, spacing, radius, motion) |
@@ -53,6 +53,10 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
 | `fonts[]` | | `family`, `css` (the `@font-face` file), `license` |
 | `install` | | extra files or folders `brandkit install` vendors (tokens, fonts, assets). The generated files, `brandkit.json`, the README and its sheet folder always go. Every path must stay inside the package |
 
+**The README brand sheet** shows every picture in every theme, labelled: the clear space, spacing, radius and icon examples as one SVG each with a panel per theme, and the type and component specimens as one PNG per theme, 880 pixels wide so text shows at true size in GitHub's README column. Spacing steps are drawn at true size as the gap between two blocks; each radius on a button, a field and a card; a brand's pixel corners, for marketing pages, on the components each step shapes. With a brand arc, the colour section lists the arc's stops and the colours on each. For a brand whose icon set is Lucide, it draws twelve common icons from the Lucide release vendored in [`internal/build/lucide`](internal/build/lucide/README.md); other sets are named only.
+
+Its **Brand assets** section lists every file under the `install` entries except token files (`*.tokens.json`, `*.resolver.json`), Markdown, dotfiles, the README, its sheet folder and the files brandkit generates. Inside a base brand installed under the package (a folder that holds its own `brandkit.json`, such as `vendor/brand/<base>/`), only that base's own `install` files show, under the same exclusions, headed with the base's name. Files are grouped by folder in `install` order; files whose names differ only in extension or a `-1x`/`-2x`/`@2x` scale suffix share a row. Each row has the file links and a one-line use (lockup for which theme, favicon, manifest icon, font file and the stylesheet that loads it, licence, and so on). SVG, PNG, JPEG and GIF files get a preview: opaque images as they are, transparent ones as a thumbnail in the sheet folder (`asset-<hash of the path>.svg`) on the ground of the theme they belong to (the theme a `lockup` names, otherwise the theme whose `base-100` contrasts most with the image's colours). Of a row's rasters, the thumbnail uses the smallest that covers it at 2x, downscaled to that if it's still larger. A `head.html` of 2 KB or less is printed below its folder's table.
+
 **Token extensions** (in a token file's root `$extensions`, merged across files like tokens):
 
 - `com.mapleset.daisyui` maps each DaisyUI variable to a token: `colors` (`base-100` … `error-content`, all 20), `radius-selector`, `radius-field`, `radius-box`, `size-selector`, `size-field`, `border`, `depth`, `noise`. Values are `"{token.path}"` or literals.
@@ -63,10 +67,12 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
   - `icons` (`set`, `strokeWidth`, `prefix`, `usage`, `examples`);
   - `radius`, `spacing` and `type` (token lists, smallest first; type largest first);
   - `fonts` (role → fontFamily token);
-  - `contrast` (`fg`, `bg`, `min`, `use`);
+  - `contrast` (`fg`, `bg`, `min`, `use`). `fg` and `bg` are colour token paths, or `daisyui:<colour>` (such as `daisyui:info-content`) for the token each theme's `com.mapleset.daisyui` mapping gives that colour, so one pair can check a different token in each theme. Without declaring anything, `check` and the sheet's Contrast table also test, in every theme, each of `primary`, `secondary`, `accent`, `neutral`, `info`, `success`, `warning` and `error` under its `-content` colour, and `base-content` on `base-100`, at 4.5:1 (normal text). A declared pair with the same `fg` and `bg` (`daisyui:accent-content` on `daisyui:accent`) replaces that automatic pair and its minimum: raise it, or set 3 for a colour kept to large type, and the sheet then draws that colour's component examples in large type (below 3, it leaves them out). A failure names the theme, the pair (with the tokens a `daisyui:` colour stands for) and the ratio;
   - `roles` (token, use);
   - `do`, `dont`;
-  - `opacityMin` (R8's threshold, default 70).
+  - `opacityMin` (R8's threshold, default 70);
+  - `corners`: `{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus", "scope": "[data-corners=\"pixel\"]", "pages": ["site/**"]}` draws every corner on marketing pages as a pixel-drawn two-step staircase instead of a radius (the first row in two steps, the second in one). Product UI (apps, dashboards) keeps the theme's smooth radius. `small` is the step in CSS pixels on selector- and field-size components (buttons, badges, inputs, selects, textareas, checkboxes, toggles, kbd, boxed tabs, join items), `box` on cards, modals, alerts, dropdowns, menus and collapses. `focus` is the colour token of the focus ring. `scope` is what a marketing page puts on its `<html>` or `<body>`: an attribute selector or a class (default `[data-corners="pixel"]`). `pages` are path globs, relative to the project root, of the marketing page sources that lint rule R10 checks; with none, R10 is off. `check` wants whole pixels from 1 to 16, a colour token for `focus`, an attribute or class `scope` and well-formed `pages`. See [Pixel corners](#pixel-corners).
+  - `arc` (optional): `{"start": 66, "step": -43.7, "tolerance": 8, "minChroma": 0.03, "exceptions": [{"token": "color.magenta", "reason": "a redder magenta reads as an error"}]}` puts every chromatic colour on one OKLCH hue path. See [Brand arc](#brand-arc).
 - `com.mapleset.css` on a token sets `name` (the custom property, without `--`) or a trailing `comment`.
 
 ## Commands
@@ -112,12 +118,56 @@ Private brand repositories need a token: `$GH_TOKEN`, `$GITHUB_TOKEN`, or `gh au
 | R7 | shadows and glows when the brand bans them, arbitrary ones (`shadow-[…]`) included; focus rings and `var(--…)` shadows are allowed |
 | R8 | low-opacity text roles such as `text-base-content/40` (a warning: check them with capture) |
 | R9 | Heroicons names in class lists and icon components' `name`, or inline SVG drawings in templates, when the brand's set is something else (DaisyUI's `hero-content` and `hero-overlay` are fine) |
+| R10 | smooth corners on a marketing page when the brand's corners are pixel-stepped there (files matching the `corners` `pages` globs; off without them): `rounded-*` classes (`rounded-lg`, `rounded-t-xl`, `rounded-full`, `rounded-[3px]`), also in compiled CSS, and `border-radius` declarations and `@theme` `--radius-*` values in CSS and `style` attributes. `rounded-none`, a radius of 0 (also with `!important`, or as a `var()` whose fallback is 0) and DaisyUI's `rounded-box`, `rounded-field` and `rounded-selector` (0 under pixel corners) are fine |
 
 To silence a finding, put `brand-lint-ignore R5: reason` anywhere on the same line or the line before; a comment is the usual place. The reason is required, and ignored findings are counted.
 
 Lint skips the folders `vendor/`, `node_modules/`, `deps/`, `_build/`, `dist/`, `testdata/` and `priv/static/`, and every folder whose name starts with a dot (`.git/`, `.elixir_ls/`). It also skips a file that is an unedited copy of one `brandkit.lock` pins, such as a `tokens.css` copied into `assets/`; an edited copy is linted. It prints how many files it checked and lists files given on the command line that it can't read; `-v` lists every file checked and skipped.
 
-Without `--config` it uses the `lint.json` of the brand in the nearest `brandkit.lock`, in the current folder or above. With no brand it exits 2, unless `--no-brand` is passed; then R6, R7 and R9 are off. It also exits 2 when it checked no files.
+Without `--config` it uses the `lint.json` of the brand in the nearest `brandkit.lock`, in the current folder or above. With no brand it exits 2, unless `--no-brand` is passed; then R6, R7, R9 and R10 are off. It also exits 2 when it checked no files.
+
+### Pixel corners
+
+Pixel-stepped corners are for marketing pages. Product UI (apps, dashboards, anything people work in) keeps the theme's smooth radius, so the corners are opt-in by scope: a marketing page puts the `scope` on its `<html>` or `<body>`, `<body data-corners="pixel">` by default (any container works; everything inside it is stepped).
+
+With `corners` set to `pixel`, `build`:
+
+- leaves DaisyUI's `--radius-selector`, `--radius-field` and `--radius-box` at the brand's radius in both theme forms, and adds `--px-focus`, each theme's `focus` colour;
+- adds the corner rules to `brand.css`, every one under the scope: `[data-corners="pixel"]` and every element in it get the radius variables at 0, and `clip-path` cuts DaisyUI's components inside it into the staircase. The selectors are `:where(<scope>) .btn` and so on, so they keep the specificity of the component they cut. On your own elements on a marketing page, use `px-corners-sm` or `px-corners-lg`; outside the scope they do nothing;
+- writes `corners` and the `pages` globs (as `cornerPages`) to `lint.json`.
+
+Lint rule R10 runs only on files that match a `pages` glob. The globs are relative to the project root (the folder of `brandkit.lock`), wherever `lint` runs from: `*` and `?` match within one folder, `**` across any number. A `--compiled` bundle is checked for R10 by the same globs, so a marketing site's own bundle (`site/dist/app.css`) is, and the app's isn't. With no `pages`, R10 is off; the corners still apply wherever the scope is.
+
+`clip-path` also cuts the border at each corner and anything drawn outside the element, so `brand.css` draws them back:
+
+- **Outline.** A `::after` layer paints the stepped outline in the element's own border colour and style (`border-color: inherit`), inside the padding box. It follows outline buttons, `card-border`, Tailwind `border-*` colours, and hover and checked states. Text inputs and textareas can't have pseudo-elements, so they get the step pixels as background layers in DaisyUI's `--input-color` instead. The outline width is `--px-bw`, a registered property that doesn't inherit. It's set to DaisyUI's `--border` on DaisyUI's bordered components, to the width of Tailwind's `border`, `border-2`, `border-4` and `border-8` on stepped elements, and is 0 elsewhere, so an element without a border gets no outline. For any other border width, set `--px-bw` yourself.
+- **Focus ring.** On focus (keyboard focus, or any focus on fields, as DaisyUI does), the clip takes in a stepped ring 2px wide outside the element: at DaisyUI's 2px gap, or one step out when the step is larger. The outline is drawn there in `--px-focus`, falling back to `base-content`. This works on inputs too.
+- **Join items.** Inside a `join`, items keep their inner corners square, so the group reads as one stepped shape (horizontal and `join-vertical`, left to right only).
+
+The README sheet shows both looks: the radius picture (product UI) and the pixel steps (marketing pages), and the component specimens end with a row inside the scope.
+
+Limits:
+
+- `select` gets its outline from `::after`, which Chrome draws with `appearance: base-select`. Browsers that don't support that show the stepped shape without the outline pixels on the steps.
+- Elements that scroll (a `modal-box` or `menu` with its own scrollbar) carry the outline layer with their content.
+- A `.btn` on an `input` (a submit button) has no `::after`, so it gets no outline pixels on the steps.
+- Radios stay round, and DaisyUI's other rounded parts (avatars, `rounded-full` utilities) are left to R10.
+- `clip-path` also cuts whatever hangs outside a stepped element. A tooltip or dropdown opened inside a stepped `card` (or any other stepped box) is cut at the box's edge. Inside the scope, keep tooltips, dropdowns and other popovers outside stepped boxes, and capture their open state: hover and open states aren't in a default capture.
+
+### Brand arc
+
+A brand can put every chromatic colour on one path around the OKLCH hue wheel, in equal steps, so the palette reads as one family (the Breakdown brands start at peach, 66°, and step 43.7° down the wheel). Declare `arc` in the rules:
+
+- `start`: the hue of stop 0, in degrees.
+- `step`: the hue step in degrees, signed: negative runs down the wheel. Stop *n* is at `start + step × n`, wrapped to 0–360.
+- `stops` (optional): how many stops; by default as many as fit in one turn (8 for 43.7°).
+- `tolerance` (optional, default 8): how many degrees a hue may sit from its stop.
+- `minChroma` (optional, default 0.03): only colour tokens with an OKLCH chroma above it count, so neutrals are skipped.
+- `exceptions`: tokens kept off the path on purpose, each with a `reason`. An exception on an alias (a role such as `color.error`) covers the token it points at in each theme.
+
+`check` warns, and doesn't fail, for each chromatic colour token whose hue is more than the tolerance from every stop and isn't an exception, naming the token, its hue and the nearest stop: once, without a theme, when every theme places it the same, and per theme otherwise. Aliases are checked through the token they point at; tokens written in OKLCH use their authored hue. It errors on an arc it can't use: a step of 0 or 180° or more, a start outside 0–360, more stops than fit in a turn, a tolerance of half the step or more, or an exception that isn't a colour token or has no reason.
+
+The README sheet's colour section lists the stops, which tokens sit on each per theme, the free stops, the exceptions and anything off the arc. To add a colour, pick the free stop nearest the hue it needs.
 
 ### Capture
 
@@ -135,7 +185,11 @@ With `--cdp`, brandkit attaches to a running browser, such as one a Playwright e
 
 ## Agent plugin
 
-`agent-plugin/` is a Claude Code plugin with one hook. After an Edit or Write to a file lint reads, it runs `brandkit lint --hook` and passes the findings back to the agent as context. The brand comes from the nearest `brandkit.lock` above the edited file. It only warns and always exits 0; CI is where lint fails. If lint can't run (the lock doesn't parse, or the brand's `lint.json` is missing until `brandkit install`), the hook tells the agent why.
+`agent-plugin/` is a Claude Code plugin with two skills and one hook.
+
+- **`brand`** ([SKILL.md](agent-plugin/skills/brand/SKILL.md)) defines or updates a brand package. It inventories the existing logos, token files, CSS and drafts, drafts the DTCG package with every conflict listed, settles the gaps with the user in one decision packet, runs `build` and `check`, and asks the user to approve the generated README sheet. It never invents a palette.
+- **`design`** ([SKILL.md](agent-plugin/skills/design/SKILL.md)) designs a screen inside the installed package; it installs the brand's package if one exists and refuses to start when none does. It writes user stories, builds three full mockups in the project's stack (a conventional one and two that each change one named axis), and runs `capture` and `lint` on each until they're clean or have had three fix rounds. The user then picks one; in a run with no user, the agent's marked pick is used. It builds the pick and has a fresh reviewer check the screenshots.
+- **The hook:** after an Edit or Write to a file lint reads, it runs `brandkit lint --hook` and passes the findings back to the agent as context. The brand comes from the nearest `brandkit.lock` above the edited file. It only warns and always exits 0; CI is where lint fails. If lint can't run (the lock doesn't parse, or the brand's `lint.json` is missing until `brandkit install`), the hook tells the agent why.
 
 The hook uses `brandkit` from PATH, or asks mise for it (`mise which`, from the project's folder, so the project's pinned version is used). It never installs anything. If neither has brandkit and the project has a `brandkit.lock`, the hook tells the agent that brandkit isn't installed; otherwise it does nothing.
 

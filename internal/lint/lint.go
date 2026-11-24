@@ -1,5 +1,5 @@
 // Package lint finds raw design values outside a brand's tokens (rules
-// R1–R9) in CSS, HTML, HEEx, Elixir ~H sigils and Go html/template files,
+// R1–R10) in CSS, HTML, HEEx, Elixir ~H sigils and Go html/template files,
 // and in compiled CSS.
 package lint
 
@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -31,6 +32,17 @@ type Config struct {
 	IconName string `json:"iconPrefix,omitempty"`
 	// OpacityMin is R8's threshold, in percent.
 	OpacityMin int `json:"opacityMin"`
+	// Corners is "pixel" when the brand cuts the corners of its marketing
+	// pages into pixel steps instead of rounding them (R10).
+	Corners string `json:"corners,omitempty"`
+	// CornerPages are the path globs, relative to the project root, of the
+	// marketing page sources. R10 runs only on files they match; with none
+	// it is off. * and ? match within one path segment, ** any number of
+	// segments.
+	CornerPages []string `json:"cornerPages,omitempty"`
+	// Root is the project root CornerPages are relative to (the folder of
+	// brandkit.lock). Empty means file names are already relative to it.
+	Root string `json:"-"`
 	// Vendored holds the sha256 of every file brandkit.lock pins. A project
 	// file with one of these hashes is an unedited copy of a brand file
 	// (tokens.css, say) and isn't linted; an edited copy is.
@@ -44,6 +56,72 @@ func (c *Config) VendoredCopy(data []byte) bool {
 	}
 	sum := sha256.Sum256(data)
 	return c.Vendored[hex.EncodeToString(sum[:])]
+}
+
+// CornerPage reports whether R10 applies to a file: the brand's corners
+// are pixel-stepped and the file, relative to the project root, matches
+// one of CornerPages.
+func (c *Config) CornerPage(name string) bool {
+	if c.Corners != "pixel" || len(c.CornerPages) == 0 {
+		return false
+	}
+	rel := filepath.ToSlash(filepath.Clean(name))
+	if c.Root != "" {
+		if abs, err := filepath.Abs(name); err == nil {
+			if r, err := filepath.Rel(c.Root, abs); err == nil && r != ".." && !strings.HasPrefix(r, ".."+string(filepath.Separator)) {
+				rel = filepath.ToSlash(r)
+			}
+		}
+	}
+	for _, g := range c.CornerPages {
+		if MatchGlob(g, rel) {
+			return true
+		}
+	}
+	return false
+}
+
+// MatchGlob matches a slash-separated path against a glob: * and ? and
+// [...] within one segment (path.Match), ** for any number of segments.
+func MatchGlob(glob, name string) bool {
+	return matchSegs(strings.Split(strings.Trim(glob, "/"), "/"), strings.Split(name, "/"))
+}
+
+func matchSegs(g, n []string) bool {
+	for len(g) > 0 {
+		if g[0] == "**" {
+			for i := 0; i <= len(n); i++ {
+				if matchSegs(g[1:], n[i:]) {
+					return true
+				}
+			}
+			return false
+		}
+		if len(n) == 0 {
+			return false
+		}
+		if ok, _ := path.Match(g[0], n[0]); !ok {
+			return false
+		}
+		g, n = g[1:], n[1:]
+	}
+	return len(n) == 0
+}
+
+// ValidGlob reports whether a CornerPages glob is well formed.
+func ValidGlob(glob string) error {
+	if strings.TrimSpace(glob) == "" {
+		return fmt.Errorf("empty glob")
+	}
+	if strings.HasPrefix(glob, "/") || strings.HasPrefix(glob, "../") || glob == ".." {
+		return fmt.Errorf("%q isn't relative to the project root", glob)
+	}
+	for _, seg := range strings.Split(glob, "/") {
+		if _, err := path.Match(seg, ""); err != nil {
+			return fmt.Errorf("%q: %w", glob, err)
+		}
+	}
+	return nil
 }
 
 // LoadConfig reads lint.json.
@@ -262,8 +340,11 @@ type raw struct {
 }
 
 type linter struct {
-	cfg   *Config
-	found []raw
+	cfg *Config
+	// corners is set when R10 applies: a marketing page of a brand whose
+	// corners are pixel-stepped there.
+	corners bool
+	found   []raw
 }
 
 func (l *linter) add(off int, rule, sev, text, format string, a ...any) {
@@ -272,7 +353,7 @@ func (l *linter) add(off int, rule, sev, text, format string, a ...any) {
 
 // Source lints one file's contents.
 func Source(cfg *Config, name string, data []byte, k Kind) ([]Finding, []Ignored) {
-	l := &linter{cfg: cfg}
+	l := &linter{cfg: cfg, corners: cfg.CornerPage(name)}
 	switch k {
 	case KindCSS:
 		l.css(data, 0, inCSS)
@@ -287,7 +368,7 @@ func Source(cfg *Config, name string, data []byte, k Kind) ([]Finding, []Ignored
 	return resolveIgnores(name, data, l.found)
 }
 
-var ignoreRe = regexp.MustCompile(`brand-lint-ignore\s+((?:R\d)(?:\s*,\s*R\d)*)\s*(?::\s*(.*?))?\s*(?:\*/|--%>|-->|%>|}}|#|$)`)
+var ignoreRe = regexp.MustCompile(`brand-lint-ignore\s+((?:R\d+)(?:\s*,\s*R\d+)*)\s*(?::\s*(.*?))?\s*(?:\*/|--%>|-->|%>|}}|#|$)`)
 
 func resolveIgnores(name string, data []byte, found []raw) ([]Finding, []Ignored) {
 	lines := lineStarts(data)
@@ -367,6 +448,7 @@ var (
 	paletteRe    = regexp.MustCompile(`^(?:` + colourUtils + `)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|mauve|olive|mist|taupe)-(?:50|[1-9]00|950)(?:/[\w.]+)?$`)
 	whiteBlackRe = regexp.MustCompile(`^(?:` + colourUtils + `)-(?:white|black)(?:/[\w.]+)?$`)
 	shadowRe     = regexp.MustCompile(`^(?:shadow|drop-shadow|text-shadow|inset-shadow)(?:-(.+))?$`)
+	roundedRe    = regexp.MustCompile(`^rounded(?:-(?:[trblse]|ss|se|es|ee|tl|tr|br|bl))?(?:-(.+))?$`)
 	opacityRe    = regexp.MustCompile(`^text-((?:base|primary|secondary|accent|neutral|info|success|warning|error)(?:-content)?|base-\d00)/(\d+)$`)
 	sizeKinds    = map[string]bool{}
 )
@@ -424,6 +506,12 @@ func (l *linter) class(c string, off int) {
 			return
 		}
 	}
+	if l.corners {
+		if m := roundedRe.FindStringSubmatch(u); m != nil && !squareRounded(m[1]) {
+			l.add(off, "R10", "error", c, "smooth rounded corner on a marketing page; the brand's corners are pixel-stepped there (DaisyUI components get them; use px-corners-sm or px-corners-lg on your own elements)")
+			return
+		}
+	}
 	if m := arbitraryRe.FindStringSubmatch(u); m != nil {
 		kind, val := m[1], strings.ReplaceAll(m[2], "_", " ")
 		if strings.HasPrefix(val, "--") {
@@ -465,6 +553,18 @@ func (l *linter) class(c string, off int) {
 			l.add(off, "R8", "warning", c, "text colour at %d%% opacity often fails contrast; check it with brandkit capture or use text-base-content/%d+", n, l.cfg.OpacityMin)
 		}
 	}
+}
+
+// squareRounded reports whether a rounded-* value keeps the corner
+// square under pixel corners: none, 0, or DaisyUI's radius variables,
+// which pixel corners set to 0.
+func squareRounded(v string) bool {
+	switch v {
+	case "none", "[0]", "[0px]", "box", "field", "selector", "(--radius-box)", "(--radius-field)", "(--radius-selector)",
+		"[var(--radius-box)]", "[var(--radius-field)]", "[var(--radius-selector)]":
+		return true
+	}
+	return false
 }
 
 // heroRe finds Heroicons names (hero-x-mark). DaisyUI's own hero-content

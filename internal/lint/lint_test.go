@@ -51,10 +51,29 @@ var want = map[string]int{
 	// An icon tag with a < inside an earlier attribute; an icon attribute
 	// other than name (F2-m3).
 	"R9/fail-attrs.heex": 2,
+	// Smooth corners on a marketing page (site/**) of a brand with pixel
+	// corners there. The same files under app/ are product UI and pass.
+	"R10/site/fail.html":             7,
+	"R10/site/fail.css":              4,
+	"compiled/site/fail-corners.css": 2,
+}
+
+// pixelConfig is the lint.json of the sub fixture, whose corners are
+// pixel-stepped (R10).
+func pixelConfig(t *testing.T) *Config {
+	t.Helper()
+	cfg, err := LoadConfig(filepath.Join("..", "..", "testdata", "brands", "sub", "export", "lint.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Corners != "pixel" || len(cfg.CornerPages) == 0 || cfg.CornerPages[0] != "site/**" {
+		t.Fatalf("the sub fixture's lint.json has corners %q on %v, want pixel on site/**", cfg.Corners, cfg.CornerPages)
+	}
+	return cfg
 }
 
 func TestRuleFixtures(t *testing.T) {
-	cfg := fixtureConfig(t)
+	base, pixel := fixtureConfig(t), pixelConfig(t)
 	root := filepath.Join("..", "..", "testdata", "lint")
 	seenPass, seenFail := map[string]bool{}, map[string]bool{}
 	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
@@ -63,7 +82,7 @@ func TestRuleFixtures(t *testing.T) {
 		}
 		rel, _ := filepath.Rel(root, p)
 		rel = filepath.ToSlash(rel)
-		dir := filepath.Dir(rel)
+		dir, below, _ := strings.Cut(rel, "/") // the rule folder, and the path below it
 		data, err := os.ReadFile(p)
 		if err != nil {
 			return err
@@ -72,7 +91,14 @@ func TestRuleFixtures(t *testing.T) {
 		if dir == "compiled" {
 			kind = KindCompiled
 		}
-		fs, ignored := Source(cfg, rel, data, kind)
+		cfg, src := base, rel
+		if dir == "R10" || strings.Contains(d.Name(), "corners") {
+			// Under R10/ and for the compiled corner bundles, the path
+			// below the rule folder is the project path R10 sees: site/…
+			// is a marketing page, app/… product UI.
+			cfg, src = pixel, below
+		}
+		fs, ignored := Source(cfg, src, data, kind)
 		switch {
 		case strings.HasPrefix(d.Name(), "pass"):
 			seenPass[dir] = true
@@ -92,7 +118,7 @@ func TestRuleFixtures(t *testing.T) {
 				t.Errorf("%s: %d findings, want %d:\n%s", rel, len(fs), n, list(fs))
 			}
 			for _, f := range fs {
-				if dir != "compiled" && dir != "ignore" && f.Rule != dir {
+				if dir != "compiled" && dir != "ignore" && f.Rule != dir || strings.Contains(d.Name(), "corners") && f.Rule != "R10" {
 					t.Errorf("%s: finding for %s, want only %s: %s", rel, f.Rule, dir, f)
 				}
 			}
@@ -102,7 +128,7 @@ func TestRuleFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, r := range []string{"R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "ignore"} {
+	for _, r := range []string{"R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "ignore"} {
 		if !seenPass[r] || !seenFail[r] {
 			t.Errorf("rule %s needs a pass and a fail fixture", r)
 		}
@@ -115,6 +141,79 @@ func list(fs []Finding) string {
 		b.WriteString("  " + f.String() + "\n")
 	}
 	return b.String()
+}
+
+// TestCornersRuleNeedsPixelCorners keeps R10 off for a brand whose
+// corners are rounded and for a pixel-corner brand that names no
+// marketing pages, and checks that an R10 ignore is read (two digits).
+func TestCornersRuleNeedsPixelCorners(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", "lint", "R10", "site", "fail.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	noPages := *pixelConfig(t)
+	noPages.CornerPages = nil
+	for name, cfg := range map[string]*Config{"rounded brand": fixtureConfig(t), "no pages": &noPages} {
+		fs, _ := Source(cfg, "site/fail.html", data, KindMarkup)
+		for _, f := range fs {
+			if f.Rule == "R10" {
+				t.Errorf("%s: R10 ran: %s", name, f)
+			}
+		}
+	}
+	pass, err := os.ReadFile(filepath.Join("..", "..", "testdata", "lint", "R10", "site", "pass.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ig := Source(pixelConfig(t), "site/pass.html", pass, KindMarkup); len(ig) != 1 || ig[0].Rule != "R10" {
+		t.Errorf("want the rounded avatar ignored under R10, got %v", ig)
+	}
+}
+
+// TestCornerPages: R10's globs match paths relative to the project root,
+// with ** across folders; Paths gets the root from the CLI.
+func TestCornerPages(t *testing.T) {
+	for _, tc := range []struct {
+		glob, name string
+		want       bool
+	}{
+		{"site/**", "site/index.html", true},
+		{"site/**", "site/blog/post.heex", true},
+		{"site/**", "app/site/index.html", false},
+		{"**/marketing/*.html", "lib/web/marketing/home.html", true},
+		{"**/marketing/*.html", "lib/web/marketing/deep/home.html", false},
+		{"pages/*.heex", "pages/pricing.heex", true},
+		{"pages/*.heex", "pages/pricing.html", false},
+	} {
+		if got := MatchGlob(tc.glob, tc.name); got != tc.want {
+			t.Errorf("MatchGlob(%q, %q) = %v, want %v", tc.glob, tc.name, got, tc.want)
+		}
+	}
+	if ValidGlob("site/[") == nil || ValidGlob("/abs/**") == nil || ValidGlob("../x") == nil || ValidGlob("site/**") != nil {
+		t.Error("ValidGlob accepts a bad glob or refuses a good one")
+	}
+
+	dir := t.TempDir()
+	html := `<div class="rounded-lg"></div>`
+	for _, p := range []string{"site/index.html", "app/index.html"} {
+		os.MkdirAll(filepath.Join(dir, filepath.Dir(p)), 0o755)
+		os.WriteFile(filepath.Join(dir, p), []byte(html), 0o644)
+	}
+	cfg := pixelConfig(t)
+	cfg.Root = dir
+	res, err := Paths(cfg, []string{dir}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Findings) != 1 || res.Findings[0].Rule != "R10" || !strings.HasSuffix(res.Findings[0].File, "site/index.html") {
+		t.Errorf("want one R10 finding, in site/index.html:\n%s", list(res.Findings))
+	}
+}
+
+func mustSource(t *testing.T, cfg *Config, data []byte) []Finding {
+	t.Helper()
+	fs, _ := Source(cfg, "fail.html", data, KindMarkup)
+	return fs
 }
 
 func TestPositions(t *testing.T) {

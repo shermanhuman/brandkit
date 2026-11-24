@@ -30,6 +30,7 @@
   --border: 1px;
   --depth: 0;
   --noise: 0;
+  --px-focus: #fcd76f;
 }
 
 [data-theme="fixture-sub-day"] {
@@ -62,4 +63,5 @@
   --border: 1px;
   --depth: 0;
   --noise: 0;
+  --px-focus: #00696f;
 }

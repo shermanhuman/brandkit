@@ -37,6 +37,7 @@
   --border: 1px;
   --depth: 0;
   --noise: 0;
+  --px-focus: #fcd76f;
 }
 
 @plugin "../vendor/daisyui-theme" {
@@ -72,6 +73,7 @@
   --border: 1px;
   --depth: 0;
   --noise: 0;
+  --px-focus: #00696f;
 }
 
 @theme {

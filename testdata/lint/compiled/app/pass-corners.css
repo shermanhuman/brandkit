@@ -1,0 +1,5 @@
+/* Product UI (not a marketing page): smooth corners are right here, so R10 is off. */
+.rounded-box{border-radius:var(--radius-box)}
+.rounded-lg{border-radius:var(--radius-lg)}
+@media (width>=48rem){.md\:rounded-full{border-radius:calc(infinity * 1px)}}
+.btn{border-radius:var(--radius-field)}

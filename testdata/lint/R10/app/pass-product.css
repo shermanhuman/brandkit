@@ -1,0 +1,16 @@
+/* Product UI (not a marketing page): smooth corners are right here, so R10 is off. */
+@theme {
+  --radius-lg: 0.5rem;
+}
+
+.card-alt {
+  border-radius: var(--radius-lg);
+}
+
+.chip {
+  @apply rounded-md;
+}
+
+.thumb {
+  border-radius: 50%;
+}

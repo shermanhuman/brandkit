@@ -22,7 +22,7 @@ func runCLI(t *testing.T, stdin string, args ...string) (int, string, string) {
 }
 
 func TestVersionAndUsage(t *testing.T) {
-	if code, out, _ := runCLI(t, "", "version"); code != 0 || out != "brandkit 0.1.0\n" {
+	if code, out, _ := runCLI(t, "", "version"); code != 0 || out != "brandkit 0.2.0\n" {
 		t.Fatalf("%d %q", code, out)
 	}
 	if code, _, _ := runCLI(t, ""); code != 2 {
@@ -218,6 +218,35 @@ func TestLintFilesAndBrand(t *testing.T) {
 	}
 	if _, out, _ := runCLI(t, "", "lint", "-v"); !strings.Contains(out, "checked app.css") || !strings.Contains(out, "skipped app.js") {
 		t.Errorf("-v: %q", out)
+	}
+}
+
+// TestLintCornerPages: R10's marketing page globs are relative to the
+// project root (the folder of brandkit.lock), wherever lint runs from.
+func TestLintCornerPages(t *testing.T) {
+	sub, _ := filepath.Abs(filepath.Join("..", "..", "testdata", "brands", "sub", "export", "lint.json"))
+	project := brandProject(t)
+	html := `<div class="rounded-lg"></div>` + "\n"
+	write(t, filepath.Join(project, "site", "index.html"), html)
+	write(t, filepath.Join(project, "app", "index.html"), html)
+	t.Chdir(filepath.Join(project, "site"))
+	if code, out, errs := runCLI(t, "", "lint", "--config", sub, "."); code != 1 || strings.Count(out, "error R10") != 1 {
+		t.Errorf("marketing page (site/**): %d %q %q", code, out, errs)
+	}
+	t.Chdir(filepath.Join(project, "app"))
+	if code, out, errs := runCLI(t, "", "lint", "--config", sub, "."); code != 0 || strings.Contains(out, "R10") {
+		t.Errorf("product UI (app/): %d %q %q", code, out, errs)
+	}
+	// A compiled bundle gets R10 by the same globs.
+	bundle := ".rounded-lg{border-radius:var(--radius-lg)}\n"
+	write(t, filepath.Join(project, "site", "dist", "app.css"), bundle)
+	write(t, filepath.Join(project, "app", "dist", "app.css"), bundle)
+	t.Chdir(project)
+	if code, out, errs := runCLI(t, "", "lint", "--config", sub, "--compiled", filepath.Join("site", "dist", "app.css")); code != 1 || !strings.Contains(out, "error R10") {
+		t.Errorf("compiled bundle under site/: %d %q %q", code, out, errs)
+	}
+	if code, out, errs := runCLI(t, "", "lint", "--config", sub, "--compiled", filepath.Join("app", "dist", "app.css")); code != 0 || strings.Contains(out, "R10") {
+		t.Errorf("compiled bundle under app/: %d %q %q", code, out, errs)
 	}
 }
 

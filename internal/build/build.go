@@ -131,7 +131,7 @@ func Write(b *brand.Brand, opts Options) ([]string, error) {
 }
 
 // sheetNameRe matches the names brandkit gives sheet files.
-var sheetNameRe = regexp.MustCompile(`^(?:sw-[0-9a-f]{6,8}\.svg|(?:clearspace|scale)-[\w-]+\.svg|(?:type|components)-[\w-]+\.png)$`)
+var sheetNameRe = regexp.MustCompile(`^(?:sw-[0-9a-f]{6,8}\.svg|(?:clearspace|scale|spacing|radius|corners|icons)(?:-[\w-]+)?\.svg|asset-[\w.-]+\.svg|(?:type|components)-[\w-]+\.png)$`)
 
 func pathJoin(a, b string) string {
 	if a == "" || a == "." {
@@ -284,7 +284,12 @@ func BrandCSS(b *brand.Brand) ([]byte, error) {
 		return nil, err
 	}
 	themes[0].Selector = ":root"
-	return writeBlocks(fmt.Sprintf("/* %s type, spacing, radius and motion. %s */\n", b.Config.Name, generatedBy(b)), themes, false), nil
+	out := writeBlocks(fmt.Sprintf("/* %s type, spacing, radius and motion. %s */\n", b.Config.Name, generatedBy(b)), themes, false)
+	rules, err := b.Default().Rules()
+	if err != nil {
+		return nil, err
+	}
+	return append(out, CornersCSS(rules.Corners)...), nil
 }
 
 func writeBlocks(header string, themes []*ThemeDecls, scheme bool) []byte {
@@ -369,6 +374,22 @@ func DaisyVars(th *brand.Theme, format string) (*DaisyTheme, error) {
 	for _, k := range ext.Keys {
 		if k != "colors" && !slices.Contains(DaisyShape, k) {
 			return nil, fmt.Errorf("theme %s: unknown DaisyUI setting %s", th.Name, k)
+		}
+	}
+	// Pixel-stepped corners redraw the focus ring in the brand's focus
+	// colour. The theme keeps its smooth radius: brand.css sets it to 0
+	// only inside the corner scope, on marketing pages.
+	rules, err := th.Rules()
+	if err != nil {
+		return nil, err
+	}
+	if c := rules.Corners; c.Pixel() {
+		if c.Focus != "" {
+			s, err := daisyValue(th, "{"+c.Focus+"}", "color", format)
+			if err != nil {
+				return nil, fmt.Errorf("theme %s: corners focus: %w", th.Name, err)
+			}
+			dt.Vars = append(dt.Vars, brand.Decl{Name: "px-focus", Value: s})
 		}
 	}
 	return dt, nil
@@ -512,6 +533,10 @@ func LintConfig(b *brand.Brand) ([]byte, error) {
 	}
 	if rules.Icons != nil {
 		l.IconSet, l.IconName = rules.Icons.Set, rules.Icons.Prefix
+	}
+	if c := rules.Corners; c.Pixel() {
+		l.Corners = "pixel"
+		l.CornerPages = c.Pages
 	}
 	fonts := map[string]bool{}
 	for _, th := range b.Themes {
