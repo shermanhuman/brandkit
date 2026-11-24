@@ -384,7 +384,8 @@ func remPx(v string) float64 {
 func (s *sheet) scale() error {
 	s.p("## Spacing and radius\n\n")
 	r := s.rules
-	if len(r.Spacing) == 0 && len(r.Radius) == 0 {
+	pixel := r.Corners.Pixel()
+	if len(r.Spacing) == 0 && len(r.Radius) == 0 && !pixel {
 		s.p("The brand declares no scales.\n\n")
 		return nil
 	}
@@ -397,7 +398,24 @@ func (s *sheet) scale() error {
 		s.img(s.asset("spacing.svg", svg), "Each spacing token as a labelled gap between two blocks, per theme")
 		s.p("\n")
 	}
-	if len(r.Radius) > 0 {
+	radius := r.Radius
+	if pixel {
+		c := r.Corners
+		s.p("**Corners: pixel-stepped, %spx small / %spx large.** Every corner is a two-step staircase of square pixels instead of a radius: %spx steps on selectors and fields (buttons, badges, inputs, checkboxes), %spx on cards and other boxes. ",
+			brand.Num(c.Small), brand.Num(c.Box), brand.Num(c.Small), brand.Num(c.Box))
+		s.p("DaisyUI's radius variables are 0 and `brand.css` cuts the corners of DaisyUI's components with `clip-path`, redraws their outline on the steps and draws the focus ring as a stepped ring outside them")
+		if c.Focus != "" {
+			s.p(" in `%s`", c.Focus)
+		}
+		s.p(". On your own elements use `px-corners-sm` or `px-corners-lg`; `brandkit lint` rule R10 flags `rounded-*` classes and `border-radius`.\n\n")
+		s.img(s.asset("radius.svg", s.cornersSheet(c)), "Buttons, badges, a checkbox, a field and a card with pixel-stepped corners, per theme")
+		s.p("\n")
+		if len(radius) > 0 {
+			s.p("The radius tokens (%s) aren't used for corners.\n\n", "`"+strings.Join(radius, "`, `")+"`")
+		}
+		radius = nil
+	}
+	if len(radius) > 0 {
 		svg, err := s.radiusSheet()
 		if err != nil {
 			return err
@@ -407,7 +425,7 @@ func (s *sheet) scale() error {
 		s.p("\n")
 	}
 	s.p("| Token | Value | Pixels |\n|---|---|---|\n")
-	ds, err := s.dimens(s.b.Default(), append(append([]string(nil), r.Spacing...), r.Radius...))
+	ds, err := s.dimens(s.b.Default(), append(append([]string(nil), r.Spacing...), radius...))
 	if err != nil {
 		return err
 	}
@@ -467,7 +485,11 @@ func (s *sheet) icons() error {
 func (s *sheet) components() error {
 	s.p("## Components\n\n")
 	s.themedPNGs("components", "Buttons, badges, alerts, a field and a card in the brand's DaisyUI theme")
-	s.p("Drawn from the DaisyUI theme variables (`--color-*`, `--radius-*`, `--border`) that `brandkit build` writes.\n\n")
+	s.p("Drawn from the DaisyUI theme variables (`--color-*`, `--radius-*`, `--border`) that `brandkit build` writes")
+	if c := s.rules.Corners; c.Pixel() {
+		s.p(", with the pixel-stepped corners `brand.css` cuts. Corners: pixel-stepped, %spx small / %spx large", brand.Num(c.Small), brand.Num(c.Box))
+	}
+	s.p(".\n\n")
 	return nil
 }
 

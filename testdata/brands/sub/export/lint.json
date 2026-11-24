@@ -12,5 +12,6 @@
   "shadows": "none",
   "iconSet": "lucide",
   "iconPrefix": "lucide-",
-  "opacityMin": 70
+  "opacityMin": 70,
+  "corners": "pixel"
 }

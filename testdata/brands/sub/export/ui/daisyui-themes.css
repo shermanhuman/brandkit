@@ -22,14 +22,15 @@
   --color-warning-content: #091018;
   --color-error: #fe8a88;
   --color-error-content: #091018;
-  --radius-selector: 0.25rem;
-  --radius-field: 0.375rem;
-  --radius-box: 0.75rem;
+  --radius-selector: 0;
+  --radius-field: 0;
+  --radius-box: 0;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
   --depth: 0;
   --noise: 0;
+  --px-focus: #fcd76f;
 }
 
 [data-theme="fixture-sub-day"] {
@@ -54,12 +55,13 @@
   --color-warning-content: #f8fafd;
   --color-error: #b32228;
   --color-error-content: #f8fafd;
-  --radius-selector: 0.25rem;
-  --radius-field: 0.375rem;
-  --radius-box: 0.75rem;
+  --radius-selector: 0;
+  --radius-field: 0;
+  --radius-box: 0;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
   --depth: 0;
   --noise: 0;
+  --px-focus: #00696f;
 }

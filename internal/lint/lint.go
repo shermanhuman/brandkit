@@ -1,5 +1,5 @@
 // Package lint finds raw design values outside a brand's tokens (rules
-// R1–R9) in CSS, HTML, HEEx, Elixir ~H sigils and Go html/template files,
+// R1–R10) in CSS, HTML, HEEx, Elixir ~H sigils and Go html/template files,
 // and in compiled CSS.
 package lint
 
@@ -31,6 +31,9 @@ type Config struct {
 	IconName string `json:"iconPrefix,omitempty"`
 	// OpacityMin is R8's threshold, in percent.
 	OpacityMin int `json:"opacityMin"`
+	// Corners is "pixel" when the brand cuts its corners into pixel steps
+	// instead of rounding them (R10).
+	Corners string `json:"corners,omitempty"`
 	// Vendored holds the sha256 of every file brandkit.lock pins. A project
 	// file with one of these hashes is an unedited copy of a brand file
 	// (tokens.css, say) and isn't linted; an edited copy is.
@@ -287,7 +290,7 @@ func Source(cfg *Config, name string, data []byte, k Kind) ([]Finding, []Ignored
 	return resolveIgnores(name, data, l.found)
 }
 
-var ignoreRe = regexp.MustCompile(`brand-lint-ignore\s+((?:R\d)(?:\s*,\s*R\d)*)\s*(?::\s*(.*?))?\s*(?:\*/|--%>|-->|%>|}}|#|$)`)
+var ignoreRe = regexp.MustCompile(`brand-lint-ignore\s+((?:R\d+)(?:\s*,\s*R\d+)*)\s*(?::\s*(.*?))?\s*(?:\*/|--%>|-->|%>|}}|#|$)`)
 
 func resolveIgnores(name string, data []byte, found []raw) ([]Finding, []Ignored) {
 	lines := lineStarts(data)
@@ -367,6 +370,7 @@ var (
 	paletteRe    = regexp.MustCompile(`^(?:` + colourUtils + `)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|mauve|olive|mist|taupe)-(?:50|[1-9]00|950)(?:/[\w.]+)?$`)
 	whiteBlackRe = regexp.MustCompile(`^(?:` + colourUtils + `)-(?:white|black)(?:/[\w.]+)?$`)
 	shadowRe     = regexp.MustCompile(`^(?:shadow|drop-shadow|text-shadow|inset-shadow)(?:-(.+))?$`)
+	roundedRe    = regexp.MustCompile(`^rounded(?:-(?:[trblse]|ss|se|es|ee|tl|tr|br|bl))?(?:-(.+))?$`)
 	opacityRe    = regexp.MustCompile(`^text-((?:base|primary|secondary|accent|neutral|info|success|warning|error)(?:-content)?|base-\d00)/(\d+)$`)
 	sizeKinds    = map[string]bool{}
 )
@@ -424,6 +428,12 @@ func (l *linter) class(c string, off int) {
 			return
 		}
 	}
+	if l.cfg.Corners == "pixel" {
+		if m := roundedRe.FindStringSubmatch(u); m != nil && !squareRounded(m[1]) {
+			l.add(off, "R10", "error", c, "smooth rounded corner; the brand's corners are pixel-stepped (DaisyUI components get them; use px-corners-sm or px-corners-lg on your own elements)")
+			return
+		}
+	}
 	if m := arbitraryRe.FindStringSubmatch(u); m != nil {
 		kind, val := m[1], strings.ReplaceAll(m[2], "_", " ")
 		if strings.HasPrefix(val, "--") {
@@ -465,6 +475,18 @@ func (l *linter) class(c string, off int) {
 			l.add(off, "R8", "warning", c, "text colour at %d%% opacity often fails contrast; check it with brandkit capture or use text-base-content/%d+", n, l.cfg.OpacityMin)
 		}
 	}
+}
+
+// squareRounded reports whether a rounded-* value keeps the corner
+// square under pixel corners: none, 0, or DaisyUI's radius variables,
+// which pixel corners set to 0.
+func squareRounded(v string) bool {
+	switch v {
+	case "none", "[0]", "[0px]", "box", "field", "selector", "(--radius-box)", "(--radius-field)", "(--radius-selector)",
+		"[var(--radius-box)]", "[var(--radius-field)]", "[var(--radius-selector)]":
+		return true
+	}
+	return false
 }
 
 // heroRe finds Heroicons names (hero-x-mark). DaisyUI's own hero-content

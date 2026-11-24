@@ -68,6 +68,7 @@ func Brand(b *brand.Brand) []Finding {
 	c.fonts(rules)
 	c.icons(rules)
 	c.roles(rules)
+	c.corners(rules)
 	return c.out
 }
 
@@ -335,6 +336,39 @@ func (c *checker) roles(r *brand.Rules) {
 			if t := th.Tokens.Get(ro.Token); t == nil || t.Type != "color" {
 				c.add("roles", "error", th.Name, "role %s isn't a colour token", ro.Token)
 			}
+		}
+	}
+}
+
+// corners checks the corner style: pixel steps of whole pixels, small no
+// larger than box, and a focus colour token for the ring they redraw.
+func (c *checker) corners(r *brand.Rules) {
+	k := r.Corners
+	if k == nil {
+		return
+	}
+	if k.Style != "pixel" {
+		c.add("corners", "error", "", "corners style is %q; the only style is \"pixel\"", k.Style)
+		return
+	}
+	for _, s := range []struct {
+		name string
+		v    float64
+	}{{"small", k.Small}, {"box", k.Box}} {
+		if s.v < 1 || s.v > 16 || s.v != float64(int(s.v)) {
+			c.add("corners", "error", "", "corners %s is %v; give the step in whole pixels, 1 to 16", s.name, s.v)
+		}
+	}
+	if k.Small > k.Box {
+		c.add("corners", "warning", "", "corners small (%v) is larger than box (%v); small controls usually take the smaller step", k.Small, k.Box)
+	}
+	if k.Focus == "" {
+		c.add("corners", "warning", "", "corners names no focus colour token; the stepped focus ring falls back to base-content")
+		return
+	}
+	for _, th := range c.b.Themes {
+		if t := th.Tokens.Get(k.Focus); t == nil || t.Type != "color" {
+			c.add("corners", "error", th.Name, "corners focus %s isn't a colour token", k.Focus)
 		}
 	}
 }

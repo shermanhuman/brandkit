@@ -43,7 +43,7 @@ Projects:
                     move one brand (or all) to a tag (default: the newest release)
   lint [paths...] [--config lint.json] [--compiled app.css]... [--json] [-v]
        [--no-brand]
-                    rules R1–R9 on CSS, HTML, HEEx, ~H and Go templates (default: .);
+                    rules R1–R10 on CSS, HTML, HEEx, ~H and Go templates (default: .);
                     the config defaults to the lint.json of the brand in the nearest
                     brandkit.lock; without a brand it exits 2 unless --no-brand.
                     -v lists every file checked and skipped
@@ -332,7 +332,7 @@ func cmdLint(args []string, stdin io.Reader, out io.Writer) (int, error) {
 		}
 		brandName := cfg.Brand
 		if !hasBrand {
-			brandName = "no brand: R6, R7, R9 off"
+			brandName = "no brand: R6, R7, R9, R10 off"
 		}
 		fmt.Fprintf(out, "%d files checked, %d errors, %d warnings, %d ignored (%s)\n", res.Files, res.Errors(), len(res.Findings)-res.Errors(), len(res.Ignored), brandName)
 	}
@@ -422,7 +422,7 @@ func runHook(stdin io.Reader, out io.Writer, cfgPath string) {
 		fmt.Fprintf(&b, "- line %d: %s %s: %s (%s)\n", f.Line, f.Severity, f.Rule, f.Message, f.Text)
 	}
 	if !hasBrand {
-		fmt.Fprintf(&b, "No %s was found above this file, so the brand rules (R6 fonts, R7 shadows, R9 icons) were off.\n", install.LockFile)
+		fmt.Fprintf(&b, "No %s was found above this file, so the brand rules (R6 fonts, R7 shadows, R9 icons, R10 corners) were off.\n", install.LockFile)
 	}
 	say(b.String())
 }

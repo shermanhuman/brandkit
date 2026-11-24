@@ -33,6 +33,12 @@
         "night": "assets/lockup-night.svg",
         "day": "assets/lockup-day.svg"
       },
+      "corners": {
+        "style": "pixel",
+        "small": 2,
+        "box": 4,
+        "focus": "color.focus"
+      },
       "do": [
         "Use violet for the primary action only; everything else follows the base brand."
       ]

@@ -201,3 +201,32 @@ func TestDeclaredDaisyPair(t *testing.T) {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// TestCorners: pixel corners need whole-pixel steps and a focus colour
+// token; the sub fixture's (2 and 4, color.focus) pass in TestFixturesPass.
+func TestCorners(t *testing.T) {
+	for _, tc := range []struct{ corners, sev, msg string }{
+		{`{"style": "round", "small": 2, "box": 4}`, "error", `corners style is "round"`},
+		{`{"style": "pixel", "small": 1.5, "box": 4, "focus": "color.focus"}`, "error", "corners small is 1.5; give the step in whole pixels"},
+		{`{"style": "pixel", "small": 2, "box": 0, "focus": "color.focus"}`, "error", "corners box is 0"},
+		{`{"style": "pixel", "small": 2, "box": 4, "focus": "color.nope"}`, "error", "corners focus color.nope isn't a colour token"},
+		{`{"style": "pixel", "small": 2, "box": 4}`, "warning", "names no focus colour token"},
+		{`{"style": "pixel", "small": 4, "box": 2, "focus": "color.focus"}`, "warning", "small (4) is larger than box (2)"},
+	} {
+		dir := copyDir(t, filepath.Join("..", "..", "testdata", "brands", "base"))
+		edit(t, filepath.Join(dir, "tokens", "semantic.tokens.json"), `"shadows": "none",`, `"shadows": "none", "corners": `+tc.corners+`,`)
+		b, err := brand.Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ok := false
+		for _, f := range Brand(b) {
+			if f.Rule == "corners" && f.Severity == tc.sev && strings.Contains(f.Message, tc.msg) {
+				ok = true
+			}
+		}
+		if !ok {
+			t.Errorf("%s: no corners %s containing %q in:\n%v", tc.corners, tc.sev, tc.msg, Brand(b))
+		}
+	}
+}

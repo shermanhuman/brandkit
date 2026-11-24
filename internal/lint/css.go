@@ -186,6 +186,8 @@ func themeProp(prop string) string {
 		!strings.HasPrefix(prop, "--font-feature-settings") && !strings.HasPrefix(prop, "--font-variation-settings") &&
 		!strings.HasSuffix(prop, "-*"):
 		return "font-family"
+	case strings.HasPrefix(prop, "--radius-"):
+		return "border-radius"
 	case strings.HasPrefix(prop, "--shadow-"), strings.HasPrefix(prop, "--inset-shadow-"),
 		strings.HasPrefix(prop, "--drop-shadow-"), strings.HasPrefix(prop, "--text-shadow-"):
 		return "box-shadow"
@@ -258,6 +260,10 @@ func (l *linter) decl(prop, val string, off int, w where, focus bool, text strin
 		l.add(off, colourRule, "error", text, "%s", colourMsg)
 		return
 	}
+	if l.cfg.Corners == "pixel" && radiusPropRe.MatchString(prop) && !squareRadius(val) {
+		l.add(off, "R10", "error", text, "border-radius; the brand's corners are pixel-stepped (use px-corners-sm or px-corners-lg)")
+		return
+	}
 	switch {
 	case prop == "font-family":
 		l.fontFamily(val, off, text)
@@ -290,6 +296,27 @@ func (l *linter) decl(prop, val string, off int, w where, focus bool, text strin
 			}
 		}
 	}
+}
+
+// radiusPropRe matches border-radius and its longhands.
+var radiusPropRe = regexp.MustCompile(`^border(?:-[a-z]+){0,2}-radius$`)
+
+// squareRadius reports whether a border-radius value keeps corners square
+// under pixel corners: 0, a CSS-wide keyword, or DaisyUI's radius
+// variables, which pixel corners set to 0.
+func squareRadius(v string) bool {
+	v = strings.TrimSpace(strings.ToLower(v))
+	if v == "initial" || v == "unset" || v == "inherit" || v == "revert" || v == "revert-layer" {
+		return true
+	}
+	for _, f := range strings.Fields(strings.ReplaceAll(v, "/", " ")) {
+		switch f {
+		case "0", "0px", "0rem", "0%", "var(--radius-selector)", "var(--radius-field)", "var(--radius-box)":
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func noneValue(v string) bool {

@@ -284,7 +284,12 @@ func BrandCSS(b *brand.Brand) ([]byte, error) {
 		return nil, err
 	}
 	themes[0].Selector = ":root"
-	return writeBlocks(fmt.Sprintf("/* %s type, spacing, radius and motion. %s */\n", b.Config.Name, generatedBy(b)), themes, false), nil
+	out := writeBlocks(fmt.Sprintf("/* %s type, spacing, radius and motion. %s */\n", b.Config.Name, generatedBy(b)), themes, false)
+	rules, err := b.Default().Rules()
+	if err != nil {
+		return nil, err
+	}
+	return append(out, CornersCSS(rules.Corners)...), nil
 }
 
 func writeBlocks(header string, themes []*ThemeDecls, scheme bool) []byte {
@@ -369,6 +374,26 @@ func DaisyVars(th *brand.Theme, format string) (*DaisyTheme, error) {
 	for _, k := range ext.Keys {
 		if k != "colors" && !slices.Contains(DaisyShape, k) {
 			return nil, fmt.Errorf("theme %s: unknown DaisyUI setting %s", th.Name, k)
+		}
+	}
+	// Pixel-stepped corners replace the radius (brand.css cuts them) and
+	// redraw the focus ring in the brand's focus colour.
+	rules, err := th.Rules()
+	if err != nil {
+		return nil, err
+	}
+	if c := rules.Corners; c.Pixel() {
+		for i, d := range dt.Vars {
+			if strings.HasPrefix(d.Name, "radius-") {
+				dt.Vars[i].Value = "0"
+			}
+		}
+		if c.Focus != "" {
+			s, err := daisyValue(th, "{"+c.Focus+"}", "color", format)
+			if err != nil {
+				return nil, fmt.Errorf("theme %s: corners focus: %w", th.Name, err)
+			}
+			dt.Vars = append(dt.Vars, brand.Decl{Name: "px-focus", Value: s})
 		}
 	}
 	return dt, nil
@@ -512,6 +537,9 @@ func LintConfig(b *brand.Brand) ([]byte, error) {
 	}
 	if rules.Icons != nil {
 		l.IconSet, l.IconName = rules.Icons.Set, rules.Icons.Prefix
+	}
+	if rules.Corners.Pixel() {
+		l.Corners = "pixel"
 	}
 	fonts := map[string]bool{}
 	for _, th := range b.Themes {

@@ -246,33 +246,84 @@ func radiusUse(th *brand.Theme, token string) string {
 	return strings.Join(uses, "; ")
 }
 
-// radiusShape draws one component with a radius at x, y and returns its width.
-type radiusShape func(w *bytes.Buffer, x, y, px float64, p palette) float64
+// shapeCorner is how a sheet shape's corners are drawn: a radius in
+// pixels, or pixel steps of step pixels when step is set.
+type shapeCorner struct{ radius, step float64 }
+
+// stairPoints are the corners of a w×h box at x, y whose corners are
+// cut into two steps of u, as in brand.css.
+func stairPoints(x, y, w, h, u float64) string {
+	X, Y := x+w, y+h
+	pts := [][2]float64{{x, y + 2*u}, {x + u, y + 2*u}, {x + u, y + u}, {x + 2*u, y + u}, {x + 2*u, y},
+		{X - 2*u, y}, {X - 2*u, y + u}, {X - u, y + u}, {X - u, y + 2*u}, {X, y + 2*u},
+		{X, Y - 2*u}, {X - u, Y - 2*u}, {X - u, Y - u}, {X - 2*u, Y - u}, {X - 2*u, Y},
+		{x + 2*u, Y}, {x + 2*u, Y - u}, {x + u, Y - u}, {x + u, Y - 2*u}, {x, Y - 2*u}}
+	out := make([]string, len(pts))
+	for i, p := range pts {
+		out[i] = brand.Num(p[0]) + "," + brand.Num(p[1])
+	}
+	return strings.Join(out, " ")
+}
+
+// stairBox draws a stepped box: the outline colour (when there is one),
+// then the fill one pixel in, as brand.css paints it.
+func stairBox(w *bytes.Buffer, x, y, wd, ht, u float64, fill, stroke, strokeAttrs string) {
+	if stroke == "" {
+		fmt.Fprintf(w, `<polygon points="%s" fill="%s"/>`, stairPoints(x, y, wd, ht, u), fill)
+		return
+	}
+	fmt.Fprintf(w, `<polygon points="%s" fill="%s"%s/>`, stairPoints(x, y, wd, ht, u), stroke, strokeAttrs)
+	fmt.Fprintf(w, `<polygon points="%s" fill="%s"/>`, stairPoints(x+1, y+1, wd-2, ht-2, u), fill)
+}
+
+// radiusShape draws one component with a radius (or pixel steps) at x, y
+// and returns its width.
+type radiusShape func(w *bytes.Buffer, x, y float64, c shapeCorner, p palette) float64
 
 var (
-	shapeCheckbox radiusShape = func(w *bytes.Buffer, x, y, px float64, p palette) float64 {
-		fmt.Fprintf(w, `<rect x="%s" y="%s" width="24" height="24" rx="%s" fill="%s"/>`, brand.Num(x), brand.Num(y+8), brand.Num(min(px, 12)), p.primary)
+	shapeCheckbox radiusShape = func(w *bytes.Buffer, x, y float64, c shapeCorner, p palette) float64 {
+		if c.step > 0 {
+			stairBox(w, x, y+8, 24, 24, c.step, p.primary, "", "")
+		} else {
+			fmt.Fprintf(w, `<rect x="%s" y="%s" width="24" height="24" rx="%s" fill="%s"/>`, brand.Num(x), brand.Num(y+8), brand.Num(min(c.radius, 12)), p.primary)
+		}
 		fmt.Fprintf(w, `<path d="M%s %sl5 5 9-10" fill="none" stroke="%s" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`, brand.Num(x+5), brand.Num(y+20), p.onPrimary)
 		svgText(w, x+32, y+25, p.fg, `font-size="14"`, "Checkbox")
 		return 96
 	}
-	shapeBadge radiusShape = func(w *bytes.Buffer, x, y, px float64, p palette) float64 {
-		fmt.Fprintf(w, `<rect x="%s" y="%s" width="64" height="24" rx="%s" fill="%s"/>`, brand.Num(x), brand.Num(y+8), brand.Num(min(px, 12)), p.primary)
+	shapeBadge radiusShape = func(w *bytes.Buffer, x, y float64, c shapeCorner, p palette) float64 {
+		if c.step > 0 {
+			stairBox(w, x, y+8, 64, 24, c.step, p.primary, "", "")
+		} else {
+			fmt.Fprintf(w, `<rect x="%s" y="%s" width="64" height="24" rx="%s" fill="%s"/>`, brand.Num(x), brand.Num(y+8), brand.Num(min(c.radius, 12)), p.primary)
+		}
 		svgText(w, x+32, y+25, p.onPrimary, `font-weight="700" font-size="12" text-anchor="middle"`, "Badge")
 		return 64
 	}
-	shapeButton radiusShape = func(w *bytes.Buffer, x, y, px float64, p palette) float64 {
-		fmt.Fprintf(w, `<rect x="%s" y="%s" width="96" height="40" rx="%s" fill="%s"/>`, brand.Num(x), brand.Num(y), brand.Num(min(px, 20)), p.primary)
+	shapeButton radiusShape = func(w *bytes.Buffer, x, y float64, c shapeCorner, p palette) float64 {
+		if c.step > 0 {
+			stairBox(w, x, y, 96, 40, c.step, p.primary, "", "")
+		} else {
+			fmt.Fprintf(w, `<rect x="%s" y="%s" width="96" height="40" rx="%s" fill="%s"/>`, brand.Num(x), brand.Num(y), brand.Num(min(c.radius, 20)), p.primary)
+		}
 		svgText(w, x+48, y+25, p.onPrimary, `font-weight="700" font-size="14" text-anchor="middle"`, "Button")
 		return 96
 	}
-	shapeField radiusShape = func(w *bytes.Buffer, x, y, px float64, p palette) float64 {
-		fmt.Fprintf(w, `<rect x="%s" y="%s" width="139" height="39" rx="%s" fill="%s" stroke="%s" stroke-opacity="0.7"/>`, brand.Num(x+0.5), brand.Num(y+0.5), brand.Num(min(px, 19.5)), p.bg, p.fg)
+	shapeField radiusShape = func(w *bytes.Buffer, x, y float64, c shapeCorner, p palette) float64 {
+		if c.step > 0 {
+			stairBox(w, x, y, 140, 40, c.step, p.bg, p.fg, ` fill-opacity="0.7"`)
+		} else {
+			fmt.Fprintf(w, `<rect x="%s" y="%s" width="139" height="39" rx="%s" fill="%s" stroke="%s" stroke-opacity="0.7"/>`, brand.Num(x+0.5), brand.Num(y+0.5), brand.Num(min(c.radius, 19.5)), p.bg, p.fg)
+		}
 		svgText(w, x+12, y+25, p.fg, `font-size="14" fill-opacity="0.8"`, "Field")
 		return 140
 	}
-	shapeCard radiusShape = func(w *bytes.Buffer, x, y, px float64, p palette) float64 {
-		fmt.Fprintf(w, `<rect x="%s" y="%s" width="127" height="71" rx="%s" fill="%s" stroke="%s"/>`, brand.Num(x+0.5), brand.Num(y+0.5), brand.Num(min(px, 35.5)), p.b200, p.b300)
+	shapeCard radiusShape = func(w *bytes.Buffer, x, y float64, c shapeCorner, p palette) float64 {
+		if c.step > 0 {
+			stairBox(w, x, y, 128, 72, c.step, p.b200, p.b300, "")
+		} else {
+			fmt.Fprintf(w, `<rect x="%s" y="%s" width="127" height="71" rx="%s" fill="%s" stroke="%s"/>`, brand.Num(x+0.5), brand.Num(y+0.5), brand.Num(min(c.radius, 35.5)), p.b200, p.b300)
+		}
 		svgText(w, x+14, y+24, p.fg, `font-weight="700" font-size="14"`, "Card")
 		svgText(w, x+14, y+44, p.fg, `font-size="12" fill-opacity="0.8"`, "a box of content")
 		return 128
@@ -306,7 +357,7 @@ func shapesWidth(shapes []radiusShape) float64 {
 		if i > 0 {
 			x += 12
 		}
-		x += sh(&w, x, 0, 0, palette{})
+		x += sh(&w, x, 0, shapeCorner{}, palette{})
 	}
 	return x
 }
@@ -338,10 +389,42 @@ func (s *sheet) radiusSheet() ([]byte, error) {
 				if j > 0 {
 					x += 12
 				}
-				x += sh(w, x, y+46, d.px, p)
+				x += sh(w, x, y+46, shapeCorner{radius: d.px}, p)
 			}
 		}
 	}), nil
+}
+
+// cornersSheet draws pixel-stepped corners on the components each step
+// size shapes, in place of the radius sheet.
+func (s *sheet) cornersSheet(c *brand.Corners) []byte {
+	rows := []struct {
+		name, use string
+		step      float64
+		shapes    []radiusShape
+	}{
+		{"small", "buttons, badges, inputs, selects, checkboxes, toggles", c.Small, []radiusShape{shapeCheckbox, shapeBadge, shapeButton, shapeField}},
+		{"box", "cards, modals, alerts, dropdowns, menus", c.Box, []radiusShape{shapeCard}},
+	}
+	pw := 420.0
+	for _, r := range rows {
+		pw = max(pw, 2*panelPad+shapesWidth(r.shapes))
+	}
+	const rowH = 132.0
+	return s.panels(pw, func(*brand.Theme) float64 { return float64(len(rows)) * rowH }, func(w *bytes.Buffer, th *brand.Theme, p palette) {
+		for i, r := range rows {
+			y := float64(i) * rowH
+			fmt.Fprintf(w, `<text x="0" y="%s" fill="%s"><tspan font-weight="700">%s</tspan> · %spx pixel steps</text>`, brand.Num(y+16), p.fg, r.name, brand.Num(r.step))
+			svgText(w, 0, y+34, p.fg, `fill-opacity="0.8" font-size="12"`, "DaisyUI "+r.use)
+			x := 0.0
+			for j, sh := range r.shapes {
+				if j > 0 {
+					x += 12
+				}
+				x += sh(w, x, y+46, shapeCorner{step: r.step}, p)
+			}
+		}
+	})
 }
 
 // Lucide icons the sheet draws for a brand whose set is Lucide.

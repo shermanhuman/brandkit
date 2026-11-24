@@ -1,0 +1,7 @@
+@theme {
+  --radius-*: initial;
+}
+
+.tile {
+  border-radius: 0 0 0 0;
+}

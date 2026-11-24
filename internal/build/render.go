@@ -96,16 +96,16 @@ body { width: %dpx; padding: 8px 0; background: var(--color-base-100); color: va
 .badge { display: inline-flex; align-items: center; height: 1.5rem; padding: 0 0.6rem; border-radius: var(--radius-selector); font-size: 0.8rem; font-weight: 700; }
 .alert { display: flex; gap: 10px; padding: 12px 16px; border-radius: var(--radius-box); }
 .field { display: grid; gap: 6px; width: 320px; }
-.input { height: 2.5rem; padding: 0 0.75rem; border-radius: var(--radius-field); border: var(--border) solid var(--color-neutral); background: var(--color-base-100); color: var(--color-base-content); font: inherit; }
+.input { --input-color: var(--color-neutral); height: 2.5rem; padding: 0 0.75rem; border-radius: var(--radius-field); border: var(--border) solid var(--input-color); background-color: var(--color-base-100); color: var(--color-base-content); font: inherit; }
 .card { width: 340px; padding: 18px; border-radius: var(--radius-box); background: var(--color-base-100); border: var(--border) solid var(--color-neutral); }
 .card h3 { margin: 0 0 6px; font-size: 1.125rem; }
 .card p { margin: 0 0 14px; }
 .muted { opacity: 0.85; }
 .large { height: auto; min-height: 2.5rem; font-size: 1.5rem; }
-</style>
+%s</style>
 </head>
 <body>
-`, SpecimenWidth, sans, mono)
+`, SpecimenWidth, sans, mono, strings.TrimPrefix(CornersCSS(rules.Corners), "\n"))
 	return w.Bytes(), nil
 }
 
@@ -168,7 +168,7 @@ func componentsBody(min map[string]float64) []byte {
 	w.WriteString(`</div></div>
 <div class="row"><div class="meta">field and card</div><div class="wrap" style="align-items: flex-start">
 <label class="field"><span>Email address</span><input class="input" value="sam@example.com"><span class="muted" style="font-size: 0.875rem">We only use it to sign you in.</span></label>
-<div class="card"><h3>Monthly report</h3><p class="muted">Covers 1 to 30 November. 14 accounts, 2 need attention.</p>` + ex("primary", `<span class="btn btn-primary">Open report</span>`) + `</div>
+<div class="card card-border"><h3>Monthly report</h3><p class="muted">Covers 1 to 30 November. 14 accounts, 2 need attention.</p>` + ex("primary", `<span class="btn btn-primary">Open report</span>`) + `</div>
 </div></div>
 </body>
 </html>

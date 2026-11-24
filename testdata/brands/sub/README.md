@@ -149,9 +149,11 @@ Fonts shipped with the package: Atkinson Hyperlegible ([`vendor/fixture-base/fon
 
 <img alt="Each spacing token as a labelled gap between two blocks, per theme" src="export/sheet/spacing.svg">
 
-**Radius.** Each corner radius, drawn on a button, a field and a card so the shapes can be compared. The line under each name says which DaisyUI components take it.
+**Corners: pixel-stepped, 2px small / 4px large.** Every corner is a two-step staircase of square pixels instead of a radius: 2px steps on selectors and fields (buttons, badges, inputs, checkboxes), 4px on cards and other boxes. DaisyUI's radius variables are 0 and `brand.css` cuts the corners of DaisyUI's components with `clip-path`, redraws their outline on the steps and draws the focus ring as a stepped ring outside them in `color.focus`. On your own elements use `px-corners-sm` or `px-corners-lg`; `brandkit lint` rule R10 flags `rounded-*` classes and `border-radius`.
 
-<img alt="A button, a field and a card drawn with each radius token, per theme" src="export/sheet/radius.svg">
+<img alt="Buttons, badges, a checkbox, a field and a card with pixel-stepped corners, per theme" src="export/sheet/radius.svg">
+
+The radius tokens (`radius.selector`, `radius.field`, `radius.box`) aren't used for corners.
 
 | Token | Value | Pixels |
 |---|---|---|
@@ -161,9 +163,6 @@ Fonts shipped with the package: Atkinson Hyperlegible ([`vendor/fixture-base/fon
 | `space.4` | `1rem` | 16 |
 | `space.6` | `1.5rem` | 24 |
 | `space.8` | `2rem` | 32 |
-| `radius.selector` | `0.25rem` | 4 |
-| `radius.field` | `0.375rem` | 6 |
-| `radius.box` | `0.75rem` | 12 |
 
 ## Icons
 
@@ -189,7 +188,7 @@ Common names: [`lucide-house`](https://lucide.dev/icons/house), [`lucide-search`
 
 <img alt="Buttons, badges, alerts, a field and a card in the brand&#39;s DaisyUI theme, Day theme" src="export/sheet/components-day.png" width="880">
 
-Drawn from the DaisyUI theme variables (`--color-*`, `--radius-*`, `--border`) that `brandkit build` writes.
+Drawn from the DaisyUI theme variables (`--color-*`, `--radius-*`, `--border`) that `brandkit build` writes, with the pixel-stepped corners `brand.css` cuts. Corners: pixel-stepped, 2px small / 4px large.
 
 ## Brand assets
 

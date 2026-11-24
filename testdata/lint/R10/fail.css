@@ -1,0 +1,15 @@
+@theme {
+  --radius-lg: 0.5rem;
+}
+
+.card-alt {
+  border-radius: var(--radius-lg);
+}
+
+.chip {
+  @apply rounded-md;
+}
+
+.thumb {
+  border-radius: 50%;
+}

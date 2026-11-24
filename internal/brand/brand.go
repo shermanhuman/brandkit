@@ -373,7 +373,25 @@ type Rules struct {
 	// OpacityMin is the lowest opacity modifier (percent) R8 lets through
 	// on a text colour role without a warning (default 70).
 	OpacityMin int `json:"opacityMin,omitempty"`
+	// Corners replaces the radius with pixel-stepped corners.
+	Corners *Corners `json:"corners,omitempty"`
 }
+
+// Corners is how the brand draws corners. Style "pixel" cuts each corner
+// into a two-step staircase of square pixels: the first row in 2 steps,
+// the second in 1. Small is the step on selector- and field-size
+// components (buttons, badges, fields, checkboxes), Box the step on
+// cards and other large surfaces, both in CSS pixels. Focus is the colour
+// token of the focus ring, which the corners redraw.
+type Corners struct {
+	Style string  `json:"style"`
+	Small float64 `json:"small"`
+	Box   float64 `json:"box"`
+	Focus string  `json:"focus,omitempty"`
+}
+
+// Pixel reports whether the brand uses pixel-stepped corners.
+func (c *Corners) Pixel() bool { return c != nil && c.Style == "pixel" }
 
 // ClearSpace is the lockup's clear-space rule.
 type ClearSpace struct {
