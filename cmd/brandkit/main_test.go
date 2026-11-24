@@ -22,7 +22,7 @@ func runCLI(t *testing.T, stdin string, args ...string) (int, string, string) {
 }
 
 func TestVersionAndUsage(t *testing.T) {
-	if code, out, _ := runCLI(t, "", "version"); code != 0 || out != "brandkit 0.1.0\n" {
+	if code, out, _ := runCLI(t, "", "version"); code != 0 || out != "brandkit 0.2.0\n" {
 		t.Fatalf("%d %q", code, out)
 	}
 	if code, _, _ := runCLI(t, ""); code != 2 {
