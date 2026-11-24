@@ -376,18 +376,14 @@ func DaisyVars(th *brand.Theme, format string) (*DaisyTheme, error) {
 			return nil, fmt.Errorf("theme %s: unknown DaisyUI setting %s", th.Name, k)
 		}
 	}
-	// Pixel-stepped corners replace the radius (brand.css cuts them) and
-	// redraw the focus ring in the brand's focus colour.
+	// Pixel-stepped corners redraw the focus ring in the brand's focus
+	// colour. The theme keeps its smooth radius: brand.css sets it to 0
+	// only inside the corner scope, on marketing pages.
 	rules, err := th.Rules()
 	if err != nil {
 		return nil, err
 	}
 	if c := rules.Corners; c.Pixel() {
-		for i, d := range dt.Vars {
-			if strings.HasPrefix(d.Name, "radius-") {
-				dt.Vars[i].Value = "0"
-			}
-		}
 		if c.Focus != "" {
 			s, err := daisyValue(th, "{"+c.Focus+"}", "color", format)
 			if err != nil {
@@ -538,8 +534,9 @@ func LintConfig(b *brand.Brand) ([]byte, error) {
 	if rules.Icons != nil {
 		l.IconSet, l.IconName = rules.Icons.Set, rules.Icons.Prefix
 	}
-	if rules.Corners.Pixel() {
+	if c := rules.Corners; c.Pixel() {
 		l.Corners = "pixel"
+		l.CornerPages = c.Pages
 	}
 	fonts := map[string]bool{}
 	for _, th := range b.Themes {

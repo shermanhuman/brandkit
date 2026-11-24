@@ -398,34 +398,39 @@ func (s *sheet) scale() error {
 		s.img(s.asset("spacing.svg", svg), "Each spacing token as a labelled gap between two blocks, per theme")
 		s.p("\n")
 	}
-	radius := r.Radius
-	if pixel {
-		c := r.Corners
-		s.p("**Corners: pixel-stepped, %spx small / %spx large.** Every corner is a two-step staircase of square pixels instead of a radius: %spx steps on selectors and fields (buttons, badges, inputs, checkboxes), %spx on cards and other boxes. ",
-			brand.Num(c.Small), brand.Num(c.Box), brand.Num(c.Small), brand.Num(c.Box))
-		s.p("DaisyUI's radius variables are 0 and `brand.css` cuts the corners of DaisyUI's components with `clip-path`, redraws their outline on the steps and draws the focus ring as a stepped ring outside them")
-		if c.Focus != "" {
-			s.p(" in `%s`", c.Focus)
-		}
-		s.p(". On your own elements use `px-corners-sm` or `px-corners-lg`; `brandkit lint` rule R10 flags `rounded-*` classes and `border-radius`.\n\n")
-		s.img(s.asset("radius.svg", s.cornersSheet(c)), "Buttons, badges, a checkbox, a field and a card with pixel-stepped corners, per theme")
-		s.p("\n")
-		if len(radius) > 0 {
-			s.p("The radius tokens (%s) aren't used for corners.\n\n", "`"+strings.Join(radius, "`, `")+"`")
-		}
-		radius = nil
-	}
-	if len(radius) > 0 {
+	if len(r.Radius) > 0 {
 		svg, err := s.radiusSheet()
 		if err != nil {
 			return err
 		}
-		s.p("**Radius.** Each corner radius, drawn on a button, a field and a card so the shapes can be compared. The line under each name says which DaisyUI components take it.\n\n")
-		s.img(s.asset("radius.svg", svg), "A button, a field and a card drawn with each radius token, per theme")
+		if pixel {
+			s.p("**Radius: product UI.** Apps and other product interfaces keep smooth corners: each corner radius, drawn on a button, a field and a card. The line under each name says which DaisyUI components take it.\n\n")
+			s.img(s.asset("radius.svg", svg), "Product UI: a button, a field and a card drawn with each radius token, per theme")
+		} else {
+			s.p("**Radius.** Each corner radius, drawn on a button, a field and a card so the shapes can be compared. The line under each name says which DaisyUI components take it.\n\n")
+			s.img(s.asset("radius.svg", svg), "A button, a field and a card drawn with each radius token, per theme")
+		}
+		s.p("\n")
+	}
+	if pixel {
+		c := r.Corners
+		s.p("**Corners: marketing pages, pixel-stepped, %spx small / %spx large.** On marketing pages every corner is a two-step staircase of square pixels instead of a radius: %spx steps on selectors and fields (buttons, badges, inputs, checkboxes), %spx on cards and other boxes. ",
+			brand.Num(c.Small), brand.Num(c.Box), brand.Num(c.Small), brand.Num(c.Box))
+		s.p("A marketing page puts `%s` on its `<html>` or `<body>`; inside it, `brand.css` sets DaisyUI's radius variables to 0, cuts the corners of DaisyUI's components with `clip-path`, redraws their outline on the steps and draws the focus ring as a stepped ring outside them", c.ScopeSelector())
+		if c.Focus != "" {
+			s.p(" in `%s`", c.Focus)
+		}
+		s.p(". Product UI, outside it, keeps the smooth radius above. On your own elements on a marketing page use `px-corners-sm` or `px-corners-lg`; ")
+		if len(c.Pages) > 0 {
+			s.p("`brandkit lint` rule R10 flags `rounded-*` classes and `border-radius` in the marketing page sources (%s).\n\n", "`"+strings.Join(c.Pages, "`, `")+"`")
+		} else {
+			s.p("`brandkit lint` rule R10 is off, because the brand names no marketing page sources (`pages`).\n\n")
+		}
+		s.img(s.asset("corners.svg", s.cornersSheet(c)), "Marketing pages: buttons, badges, a checkbox, a field and a card with pixel-stepped corners, per theme")
 		s.p("\n")
 	}
 	s.p("| Token | Value | Pixels |\n|---|---|---|\n")
-	ds, err := s.dimens(s.b.Default(), append(append([]string(nil), r.Spacing...), radius...))
+	ds, err := s.dimens(s.b.Default(), append(append([]string(nil), r.Spacing...), r.Radius...))
 	if err != nil {
 		return err
 	}
@@ -487,7 +492,7 @@ func (s *sheet) components() error {
 	s.themedPNGs("components", "Buttons, badges, alerts, a field and a card in the brand's DaisyUI theme")
 	s.p("Drawn from the DaisyUI theme variables (`--color-*`, `--radius-*`, `--border`) that `brandkit build` writes")
 	if c := s.rules.Corners; c.Pixel() {
-		s.p(", with the pixel-stepped corners `brand.css` cuts. Corners: pixel-stepped, %spx small / %spx large", brand.Num(c.Small), brand.Num(c.Box))
+		s.p(". The rows are product UI, with the smooth radius, except the last: a marketing page, inside `%s`, with the pixel-stepped corners `brand.css` cuts there (%spx small / %spx large)", c.ScopeSelector(), brand.Num(c.Small), brand.Num(c.Box))
 	}
 	s.p(".\n\n")
 	return nil

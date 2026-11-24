@@ -37,7 +37,7 @@ func Pages(b *brand.Brand) (map[string][]byte, error) {
 			return nil, err
 		}
 		pages["type-"+th.Name+".html"] = append(append([]byte(nil), head...), typeBody(th, rules)...)
-		pages["components-"+th.Name+".html"] = append(append([]byte(nil), head...), componentsBody(ContentMin(b, rules))...)
+		pages["components-"+th.Name+".html"] = append(append([]byte(nil), head...), componentsBody(ContentMin(b, rules), rules.Corners)...)
 	}
 	return pages, nil
 }
@@ -132,8 +132,10 @@ func typeBody(th *brand.Theme, rules *brand.Rules) []byte {
 // DaisyUI colour that `check` tests against its -content colour, at the
 // minimum in min (by colour). Normal-size text needs 4.5:1, so a colour
 // checked at 3:1 (a brand that keeps it to large type) is drawn in large
-// type, and one checked below 3:1 isn't drawn.
-func componentsBody(min map[string]float64) []byte {
+// type, and one checked below 3:1 isn't drawn. A brand with pixel corners
+// gets a last row inside the corner scope, as on a marketing page; the
+// rows above are product UI, with the smooth radius.
+func componentsBody(min map[string]float64, corners *brand.Corners) []byte {
 	ex := func(role, html string) string {
 		switch m := min[role]; {
 		case m >= DaisyMin:
@@ -170,9 +172,21 @@ func componentsBody(min map[string]float64) []byte {
 <label class="field"><span>Email address</span><input class="input" value="sam@example.com"><span class="muted" style="font-size: 0.875rem">We only use it to sign you in.</span></label>
 <div class="card card-border"><h3>Monthly report</h3><p class="muted">Covers 1 to 30 November. 14 accounts, 2 need attention.</p>` + ex("primary", `<span class="btn btn-primary">Open report</span>`) + `</div>
 </div></div>
-</body>
-</html>
 `)
+	if name, value, ok := corners.ScopeAttr(); ok && corners.Pixel() {
+		attr := fmt.Sprintf(`class="row" %s="%s"`, name, html.EscapeString(value))
+		if name == "class" {
+			attr = fmt.Sprintf(`class="row %s"`, html.EscapeString(value))
+		}
+		fmt.Fprintf(&w, `<div %s><div class="meta">marketing pages only: pixel-stepped corners inside %s</div><div class="wrap" style="align-items: flex-start">
+`, attr, html.EscapeString(corners.ScopeSelector()))
+		w.WriteString(ex("primary", `<span class="btn btn-primary">Start free</span>`) + `<span class="btn btn-outline">See pricing</span>` +
+			ex("accent", `<span class="badge" style="background: var(--color-accent); color: var(--color-accent-content)">New</span>`) + "\n")
+		w.WriteString(`<div class="card card-border"><h3>Plans for every team</h3><p class="muted">Pixel-stepped corners are for marketing pages; the app stays smooth.</p></div>
+</div></div>
+`)
+	}
+	w.WriteString("</body>\n</html>\n")
 	return []byte(w.String())
 }
 

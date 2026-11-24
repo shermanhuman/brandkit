@@ -202,8 +202,10 @@ func TestDeclaredDaisyPair(t *testing.T) {
 	}
 }
 
-// TestCorners: pixel corners need whole-pixel steps and a focus colour
-// token; the sub fixture's (2 and 4, color.focus) pass in TestFixturesPass.
+// TestCorners: pixel corners need whole-pixel steps, a focus colour
+// token, a scope that is an attribute or a class, and well-formed page
+// globs; the sub fixture's (2 and 4, color.focus, site/**) pass in
+// TestFixturesPass.
 func TestCorners(t *testing.T) {
 	for _, tc := range []struct{ corners, sev, msg string }{
 		{`{"style": "round", "small": 2, "box": 4}`, "error", `corners style is "round"`},
@@ -212,6 +214,13 @@ func TestCorners(t *testing.T) {
 		{`{"style": "pixel", "small": 2, "box": 4, "focus": "color.nope"}`, "error", "corners focus color.nope isn't a colour token"},
 		{`{"style": "pixel", "small": 2, "box": 4}`, "warning", "names no focus colour token"},
 		{`{"style": "pixel", "small": 4, "box": 2, "focus": "color.focus"}`, "warning", "small (4) is larger than box (2)"},
+		// The scope is an attribute or a class the page's <html> or <body> carries.
+		{`{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus", "scope": "main .hero"}`, "error", `corners scope "main .hero" isn't an attribute selector`},
+		{`{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus", "scope": "[data-x=\"a\"], .b"}`, "error", "isn't an attribute selector"},
+		{`{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus", "pages": ["site/["]}`, "error", "corners pages:"},
+		{`{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus", "pages": ["/srv/site/**"]}`, "error", "isn't relative to the project root"},
+		{`{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus", "scope": ".marketing", "pages": ["site/**"]}`, "", ""},
+		{`{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus", "scope": "[data-page=\"marketing\"]"}`, "", ""},
 	} {
 		dir := copyDir(t, filepath.Join("..", "..", "testdata", "brands", "base"))
 		edit(t, filepath.Join(dir, "tokens", "semantic.tokens.json"), `"shadows": "none",`, `"shadows": "none", "corners": `+tc.corners+`,`)
@@ -219,13 +228,18 @@ func TestCorners(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ok := false
+		ok, seen := false, false
 		for _, f := range Brand(b) {
-			if f.Rule == "corners" && f.Severity == tc.sev && strings.Contains(f.Message, tc.msg) {
-				ok = true
+			if f.Rule == "corners" {
+				seen = true
+				if f.Severity == tc.sev && strings.Contains(f.Message, tc.msg) {
+					ok = true
+				}
 			}
 		}
-		if !ok {
+		if tc.sev == "" && seen {
+			t.Errorf("%s: want no corners findings, got:\n%v", tc.corners, Brand(b))
+		} else if tc.sev != "" && !ok {
 			t.Errorf("%s: no corners %s containing %q in:\n%v", tc.corners, tc.sev, tc.msg, Brand(b))
 		}
 	}

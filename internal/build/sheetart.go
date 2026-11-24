@@ -396,7 +396,8 @@ func (s *sheet) radiusSheet() ([]byte, error) {
 }
 
 // cornersSheet draws pixel-stepped corners on the components each step
-// size shapes, in place of the radius sheet.
+// size shapes, as marketing pages show them (product UI keeps the radius
+// sheet's smooth corners).
 func (s *sheet) cornersSheet(c *brand.Corners) []byte {
 	rows := []struct {
 		name, use string
@@ -414,7 +415,7 @@ func (s *sheet) cornersSheet(c *brand.Corners) []byte {
 	return s.panels(pw, func(*brand.Theme) float64 { return float64(len(rows)) * rowH }, func(w *bytes.Buffer, th *brand.Theme, p palette) {
 		for i, r := range rows {
 			y := float64(i) * rowH
-			fmt.Fprintf(w, `<text x="0" y="%s" fill="%s"><tspan font-weight="700">%s</tspan> · %spx pixel steps</text>`, brand.Num(y+16), p.fg, r.name, brand.Num(r.step))
+			fmt.Fprintf(w, `<text x="0" y="%s" fill="%s"><tspan font-weight="700">%s</tspan> · %spx pixel steps · marketing pages only</text>`, brand.Num(y+16), p.fg, r.name, brand.Num(r.step))
 			svgText(w, 0, y+34, p.fg, `fill-opacity="0.8" font-size="12"`, "DaisyUI "+r.use)
 			x := 0.0
 			for j, sh := range r.shapes {

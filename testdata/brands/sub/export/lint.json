@@ -13,5 +13,9 @@
   "iconSet": "lucide",
   "iconPrefix": "lucide-",
   "opacityMin": 70,
-  "corners": "pixel"
+  "corners": "pixel",
+  "cornerPages": [
+    "site/**",
+    "marketing/**"
+  ]
 }

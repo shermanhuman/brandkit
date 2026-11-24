@@ -71,7 +71,7 @@ Its **Brand assets** section lists every file under the `install` entries except
   - `roles` (token, use);
   - `do`, `dont`;
   - `opacityMin` (R8's threshold, default 70);
-  - `corners`: `{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus"}` draws every corner as a pixel-drawn two-step staircase instead of a radius (the first row in two steps, the second in one). `small` is the step in CSS pixels on selector- and field-size components (buttons, badges, inputs, selects, textareas, checkboxes, toggles, kbd, boxed tabs, join items), `box` on cards, modals, alerts, dropdowns, menus and collapses. `focus` is the colour token of the focus ring. `check` wants whole pixels from 1 to 16 and a colour token for `focus`. See [Pixel corners](#pixel-corners).
+  - `corners`: `{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus", "scope": "[data-corners=\"pixel\"]", "pages": ["site/**"]}` draws every corner on marketing pages as a pixel-drawn two-step staircase instead of a radius (the first row in two steps, the second in one). Product UI (apps, dashboards) keeps the theme's smooth radius. `small` is the step in CSS pixels on selector- and field-size components (buttons, badges, inputs, selects, textareas, checkboxes, toggles, kbd, boxed tabs, join items), `box` on cards, modals, alerts, dropdowns, menus and collapses. `focus` is the colour token of the focus ring. `scope` is what a marketing page puts on its `<html>` or `<body>`: an attribute selector or a class (default `[data-corners="pixel"]`). `pages` are path globs, relative to the project root, of the marketing page sources that lint rule R10 checks; with none, R10 is off. `check` wants whole pixels from 1 to 16, a colour token for `focus`, an attribute or class `scope` and well-formed `pages`. See [Pixel corners](#pixel-corners).
 - `com.mapleset.css` on a token sets `name` (the custom property, without `--`) or a trailing `comment`.
 
 ## Commands
@@ -117,7 +117,7 @@ Private brand repositories need a token: `$GH_TOKEN`, `$GITHUB_TOKEN`, or `gh au
 | R7 | shadows and glows when the brand bans them, arbitrary ones (`shadow-[…]`) included; focus rings and `var(--…)` shadows are allowed |
 | R8 | low-opacity text roles such as `text-base-content/40` (a warning: check them with capture) |
 | R9 | Heroicons names in class lists and icon components' `name`, or inline SVG drawings in templates, when the brand's set is something else (DaisyUI's `hero-content` and `hero-overlay` are fine) |
-| R10 | smooth corners when the brand's corners are pixel-stepped: `rounded-*` classes (`rounded-lg`, `rounded-t-xl`, `rounded-full`, `rounded-[3px]`), also in compiled CSS, and `border-radius` declarations and `@theme` `--radius-*` values in CSS and `style` attributes. `rounded-none`, a radius of 0 and DaisyUI's `rounded-box`, `rounded-field` and `rounded-selector` (0 under pixel corners) are fine |
+| R10 | smooth corners on a marketing page when the brand's corners are pixel-stepped there (files matching the `corners` `pages` globs; off without them): `rounded-*` classes (`rounded-lg`, `rounded-t-xl`, `rounded-full`, `rounded-[3px]`), also in compiled CSS, and `border-radius` declarations and `@theme` `--radius-*` values in CSS and `style` attributes. `rounded-none`, a radius of 0 and DaisyUI's `rounded-box`, `rounded-field` and `rounded-selector` (0 under pixel corners) are fine |
 
 To silence a finding, put `brand-lint-ignore R5: reason` anywhere on the same line or the line before; a comment is the usual place. The reason is required, and ignored findings are counted.
 
@@ -127,10 +127,15 @@ Without `--config` it uses the `lint.json` of the brand in the nearest `brandkit
 
 ### Pixel corners
 
+Pixel-stepped corners are for marketing pages. Product UI (apps, dashboards, anything people work in) keeps the theme's smooth radius, so the corners are opt-in by scope: a marketing page puts the `scope` on its `<html>` or `<body>`, `<body data-corners="pixel">` by default (any container works; everything inside it is stepped).
+
 With `corners` set to `pixel`, `build`:
 
-- sets DaisyUI's `--radius-selector`, `--radius-field` and `--radius-box` to 0 in both theme forms, and adds `--px-focus`, each theme's `focus` colour;
-- adds the corner rules to `brand.css`. `clip-path` cuts DaisyUI's components into the staircase. On your own elements, use `px-corners-sm` or `px-corners-lg`.
+- leaves DaisyUI's `--radius-selector`, `--radius-field` and `--radius-box` at the brand's radius in both theme forms, and adds `--px-focus`, each theme's `focus` colour;
+- adds the corner rules to `brand.css`, every one under the scope: `[data-corners="pixel"]` and every element in it get the radius variables at 0, and `clip-path` cuts DaisyUI's components inside it into the staircase. The selectors are `:where(<scope>) .btn` and so on, so they keep the specificity of the component they cut. On your own elements on a marketing page, use `px-corners-sm` or `px-corners-lg`; outside the scope they do nothing;
+- writes `corners` and the `pages` globs (as `cornerPages`) to `lint.json`.
+
+Lint rule R10 runs only on files that match a `pages` glob. The globs are relative to the project root (the folder of `brandkit.lock`), wherever `lint` runs from: `*` and `?` match within one folder, `**` across any number. A `--compiled` bundle is checked for R10 by the same globs, so a marketing site's own bundle (`site/dist/app.css`) is, and the app's isn't. With no `pages`, R10 is off; the corners still apply wherever the scope is.
 
 `clip-path` also cuts the border at each corner and anything drawn outside the element, so `brand.css` draws them back:
 
@@ -138,7 +143,7 @@ With `corners` set to `pixel`, `build`:
 - **Focus ring.** On focus (keyboard focus, or any focus on fields, as DaisyUI does), the clip takes in a stepped ring 2px wide outside the element: at DaisyUI's 2px gap, or one step out when the step is larger. The outline is drawn there in `--px-focus`, falling back to `base-content`. This works on inputs too.
 - **Join items.** Inside a `join`, items keep their inner corners square, so the group reads as one stepped shape (horizontal and `join-vertical`, left to right only).
 
-The radius tokens stay in `brand.css` but no longer shape anything. The README sheet draws the steps in place of the radius picture, and the component specimens are drawn with them.
+The README sheet shows both looks: the radius picture (product UI) and the pixel steps (marketing pages), and the component specimens end with a row inside the scope.
 
 Limits:
 

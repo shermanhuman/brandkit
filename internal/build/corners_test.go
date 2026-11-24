@@ -50,26 +50,45 @@ func TestCornersCSS(t *testing.T) {
 	s := string(bc)
 	for _, want := range []string{
 		"@property --px-bw {\n  syntax: \"<length>\";\n  inherits: false;",
-		"--radius-selector: 0;\n  --radius-field: 0;\n  --radius-box: 0;",
-		".px-corners-sm {\n  clip-path: " + StairClip(2, cornersAll) + ";",
-		".px-corners-lg {\n  clip-path: " + StairClip(4, cornersAll) + ";",
-		".btn:not(input)::after,", ".card::after,", "border-color: inherit;",
-		"input.input,\ntextarea.textarea {\n  background-image:",
+		// The radius goes to 0 only inside the scope, on every element
+		// there, so a nested [data-theme] can't bring it back.
+		"[data-corners=\"pixel\"],\n[data-corners=\"pixel\"] * {\n  --radius-selector: 0;\n  --radius-field: 0;\n  --radius-box: 0;",
+		`:where([data-corners="pixel"]) .px-corners-sm {` + "\n  clip-path: " + StairClip(2, cornersAll) + ";",
+		`:where([data-corners="pixel"]) .px-corners-lg {` + "\n  clip-path: " + StairClip(4, cornersAll) + ";",
+		`:where([data-corners="pixel"]) .btn:not(input)::after,`, `:where([data-corners="pixel"]) .card::after,`, "border-color: inherit;",
+		`:where([data-corners="pixel"]) input.input,` + "\n" + `:where([data-corners="pixel"]) textarea.textarea {` + "\n  background-image:",
 		"outline: 4px solid var(--px-focus, var(--color-base-content));",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("brand.css lacks %q", want)
 		}
 	}
-	// Every component the brief names is stepped at its size.
+	// Every component the brief names is stepped at its size, in the scope.
 	for _, sel := range []string{".btn", ".badge", ".input", ".select", ".textarea", ".checkbox", ".toggle", ".kbd", ".tabs-box > .tab"} {
+		sel = `:where([data-corners="pixel"]) ` + sel
 		if !strings.Contains(s, sel+",\n") && !strings.Contains(s, sel+" {") {
 			t.Errorf("brand.css doesn't step %s", sel)
 		}
 	}
 	for _, sel := range []string{".card", ".modal-box", ".alert", ".dropdown-content", ".menu", ".collapse"} {
-		if !strings.Contains(s, sel+",\n") {
+		if !strings.Contains(s, `:where([data-corners="pixel"]) `+sel+",\n") {
 			t.Errorf("brand.css doesn't step %s", sel)
+		}
+	}
+	// Nothing in the corner rules applies outside the scope.
+	corners := s[strings.Index(s, "/* Pixel-stepped corners"):]
+	for _, rule := range strings.Split(corners, "\n}\n") {
+		head, _, ok := strings.Cut(rule, "{")
+		if !ok || strings.Contains(head, "@property") || strings.Contains(head, "@layer") {
+			continue
+		}
+		if i := strings.LastIndex(head, "*/"); i >= 0 {
+			head = head[i+2:]
+		}
+		for _, sel := range splitSelectors(strings.TrimSpace(head)) {
+			if !strings.HasPrefix(sel, `:where([data-corners="pixel"]) `) && !strings.HasPrefix(sel, `[data-corners="pixel"]`) {
+				t.Errorf("corner rule outside the scope: %q", sel)
+			}
 		}
 	}
 	for _, form := range []func(*brand.Brand, string) ([]byte, error){DaisyThemes, DaisyPlugin} {
@@ -78,9 +97,10 @@ func TestCornersCSS(t *testing.T) {
 			t.Fatal(err)
 		}
 		o := string(out)
+		// The themes keep their smooth radius for product UI.
 		for _, v := range []string{"radius-selector", "radius-field", "radius-box"} {
-			if n, z := strings.Count(o, "--"+v+":"), strings.Count(o, "--"+v+": 0;"); n == 0 || n != z {
-				t.Errorf("theme form: --%s isn't 0 in every theme (%d of %d)", v, z, n)
+			if n, z := strings.Count(o, "--"+v+":"), strings.Count(o, "--"+v+": 0;"); n == 0 || z != 0 {
+				t.Errorf("theme form: --%s is 0 in %d of %d themes; product UI keeps the radius", v, z, n)
 			}
 		}
 		for _, th := range sub.Themes {
@@ -94,8 +114,13 @@ func TestCornersCSS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(lj), `"corners": "pixel"`) {
-		t.Errorf("lint.json doesn't turn on R10:\n%s", lj)
+	if !strings.Contains(string(lj), `"corners": "pixel"`) || !strings.Contains(string(lj), `"cornerPages": [`+"\n    \"site/**\"") {
+		t.Errorf("lint.json doesn't turn on R10 for the marketing pages:\n%s", lj)
+	}
+	// Another scope, as a class.
+	cls := CornersCSS(&brand.Corners{Style: "pixel", Small: 2, Box: 4, Scope: ".marketing"})
+	if !strings.Contains(cls, ".marketing,\n.marketing * {\n  --radius-selector: 0;") || !strings.Contains(cls, ":where(.marketing) .btn,") || strings.Contains(cls, "data-corners") {
+		t.Errorf("scope .marketing isn't used:\n%s", cls[:min(len(cls), 1200)])
 	}
 
 	base := load(t, "base")
@@ -120,23 +145,32 @@ func hexOf(t *testing.T, th *brand.Theme, token string) string {
 }
 
 // cornersMarkup puts a real DaisyUI outline button, text input and
-// bordered card at whole-pixel positions on a green page, in tab order.
+// bordered card at whole-pixel positions on a green page, in tab order:
+// first inside the corner scope, as on a marketing page, then the same
+// three outside it, as product UI.
 const cornersMarkup = `<!doctype html>
 <html lang="en">
 <head><link rel="stylesheet" href="/out.css"><style>*{transition:none!important} html,body{margin:0;background:rgb(0,255,0)!important}</style></head>
 <body>
+<div data-corners="pixel">
 <button id="btn" class="btn btn-outline" style="position:absolute;left:40px;top:40px;width:120px">Cancel</button>
 <input id="input" class="input" style="position:absolute;left:40px;top:120px;width:200px" value="sam@example.com">
 <div id="card" class="card card-border bg-base-100" tabindex="0" style="position:absolute;left:40px;top:200px;width:240px;height:120px"><div class="card-body">Card</div></div>
+</div>
+<button id="app-btn" class="btn btn-outline" style="position:absolute;left:400px;top:40px;width:120px">Cancel</button>
+<input id="app-input" class="input" style="position:absolute;left:400px;top:120px;width:200px" value="sam@example.com">
+<div id="app-card" class="card card-border bg-base-100" tabindex="0" style="position:absolute;left:400px;top:200px;width:240px;height:120px"><div class="card-body">Card</div></div>
 </body>
 </html>
 `
 
 // TestPixelCornersRendered compiles the sub fixture (pixel corners, 2px
 // small and 4px box steps) with Tailwind against daisyUI 5.8.2, in both
-// theme forms, and reads pixels in Chrome: the cut corners show the page,
-// the step pixels carry the outline, and after Tab the stepped focus ring
-// is drawn outside the shape in the brand's focus colour.
+// theme forms, and reads pixels in Chrome. Inside the corner scope the cut
+// corners show the page, the step pixels carry the outline, and after Tab
+// the stepped focus ring is drawn outside the shape in the brand's focus
+// colour. Outside it the same components keep the theme's smooth radius
+// and DaisyUI's own focus outline.
 func TestPixelCornersRendered(t *testing.T) {
 	tw := tailwind(t)
 	if _, err := browser.Find(""); err != nil {
@@ -192,7 +226,7 @@ func TestPixelCornersRendered(t *testing.T) {
 			if log, err := cmd.CombinedOutput(); err != nil || !strings.Contains(string(log), "daisyUI 5.8.2") {
 				t.Fatalf("tailwindcss: %v\n%s", err, log)
 			}
-			checkCorners(t, dir, focus)
+			checkCorners(t, dir, focus, radii(t, b.Default()))
 		})
 	}
 }
@@ -204,7 +238,26 @@ type box struct {
 	u          int
 }
 
-func checkCorners(t *testing.T, dir string, fc color.RGBA) {
+// radii are the theme's radius-field and radius-box in CSS pixels.
+func radii(t *testing.T, th *brand.Theme) map[string]float64 {
+	t.Helper()
+	dt, err := DaisyVars(th, "hex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]float64{}
+	for _, d := range dt.Vars {
+		if d.Name == "radius-field" || d.Name == "radius-box" {
+			out[d.Name] = remPx(d.Value)
+		}
+	}
+	if out["radius-field"] < 4 || out["radius-box"] < 4 {
+		t.Fatalf("the fixture's radii are too small to tell from pixel steps: %v", out)
+	}
+	return out
+}
+
+func checkCorners(t *testing.T, dir string, fc color.RGBA, radius map[string]float64) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -226,14 +279,14 @@ func checkCorners(t *testing.T, dir string, fc color.RGBA) {
 	defer cancel()
 	ctx, c2 := context.WithTimeout(ctx, 60*time.Second)
 	defer c2()
-	if err := chromedp.Do(ctx, chromedp.EmulateViewport(400, 360, chromedp.EmulateScale(1)), chromedp.Navigate("http://"+ln.Addr().String()+"/")); err != nil {
+	if err := chromedp.Do(ctx, chromedp.EmulateViewport(720, 360, chromedp.EmulateScale(1)), chromedp.Navigate("http://"+ln.Addr().String()+"/")); err != nil {
 		t.Fatal(err)
 	}
-	rects, err := chromedp.Run(ctx, chromedp.Evaluate[[][4]float64](`["btn","input","card"].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; })`))
+	rects, err := chromedp.Run(ctx, chromedp.Evaluate[[][4]float64](`["btn","input","card","app-btn","app-input","app-card"].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; })`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	boxes := []box{{id: "btn", u: 2}, {id: "input", u: 2}, {id: "card", u: 4}}
+	boxes := []box{{id: "btn", u: 2}, {id: "input", u: 2}, {id: "card", u: 4}, {id: "app-btn"}, {id: "app-input"}, {id: "app-card"}}
 	for i := range boxes {
 		r := rects[i]
 		if r[0] != float64(int(r[0])) || r[1] != float64(int(r[1])) || r[2] != float64(int(r[2])) || r[3] != float64(int(r[3])) {
@@ -274,10 +327,42 @@ func checkCorners(t *testing.T, dir string, fc color.RGBA) {
 		}
 	}
 
-	// Unfocused: the cut corners show the page; the step pixels carry the
-	// outline, the same colour as the straight border.
+	pixel, app := boxes[:3], boxes[3:]
+	// style reads computed styles of an element: its clip-path, top-left
+	// radius, outline width and offset.
+	style := func(id string) [4]string {
+		t.Helper()
+		st, err := chromedp.Run(ctx, chromedp.Evaluate[[4]string](`(() => { const s = getComputedStyle(document.getElementById("`+id+`")); return [s.clipPath, s.borderTopLeftRadius, s.outlineWidth, s.outlineOffset]; })()`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return st
+	}
+	wantRadius := map[string]float64{"app-btn": radius["radius-field"], "app-input": radius["radius-field"], "app-card": radius["radius-box"]}
+
+	// Unfocused, inside the scope: the cut corners show the page; the step
+	// pixels carry the outline, the same colour as the straight border.
 	img := shot()
-	for _, bx := range boxes {
+	for _, bx := range pixel {
+		if st := style(bx.id); !strings.HasPrefix(st[0], "polygon(") || st[1] != "0px" {
+			t.Errorf("%s in the scope: clip-path %q, radius %q; want a polygon and 0px", bx.id, st[0], st[1])
+		}
+	}
+	// Outside it: no clip, the theme's radius, and the corner pixel that
+	// the steps paint with the outline (one step along the top edge)
+	// shows the page through the round corner instead.
+	for _, bx := range app {
+		st := style(bx.id)
+		if st[0] != "none" || st[1] != brand.Num(wantRadius[bx.id])+"px" {
+			t.Errorf("%s outside the scope: clip-path %q, radius %q; want none and %spx", bx.id, st[0], st[1], brand.Num(wantRadius[bx.id]))
+		}
+		expect(img, "round corner pixel", bx, 1, 0, green)
+		expect(img, "round corner pixel", bx, 0, 1, green)
+		if border := at(img, bx.x, bx.y+bx.h/2); near(border, green) {
+			t.Errorf("%s: no border outside the scope", bx.id)
+		}
+	}
+	for _, bx := range pixel {
 		u, w, h := bx.u, bx.w, bx.h
 		border := at(img, bx.x, bx.y+h/2)
 		if near(border, green) || near(border, at(img, bx.x+w/2, bx.y+h/2)) {
@@ -291,8 +376,9 @@ func checkCorners(t *testing.T, dir string, fc color.RGBA) {
 		}
 	}
 
-	// Keyboard focus: Tab to each element in turn. The stepped ring sits 2px
-	// outside the shape and 2px wide, in the brand's focus colour.
+	// Keyboard focus: Tab to each element in turn. Inside the scope the
+	// stepped ring sits 2px outside the shape and 2px wide, in the brand's
+	// focus colour; outside it DaisyUI's own outline is drawn, unclipped.
 	for _, bx := range boxes {
 		if err := chromedp.Do(ctx, chromedp.KeyEvent(kb.Tab)); err != nil {
 			t.Fatal(err)
@@ -305,6 +391,16 @@ func checkCorners(t *testing.T, dir string, fc color.RGBA) {
 			t.Fatalf("Tab focused %q, want %q", active, bx.id)
 		}
 		img := shot()
+		if bx.u == 0 {
+			st := style(bx.id)
+			if st[0] != "none" || st[2] != "2px" || st[3] != "2px" {
+				t.Errorf("%s focused outside the scope: clip-path %q, outline %s at offset %s; want none, DaisyUI's 2px at 2px", bx.id, st[0], st[2], st[3])
+			}
+			if near(at(img, bx.x-3, bx.y+bx.h/2), green) || !near(at(img, bx.x-1, bx.y+bx.h/2), green) {
+				t.Errorf("%s focused outside the scope: no smooth outline 2px out", bx.id)
+			}
+			continue
+		}
 		u, w, h := bx.u, bx.w, bx.h
 		g := max(2, u) // the gap: 2px, or one step on boxes
 		r := g + 2     // the ring's outer edge

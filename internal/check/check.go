@@ -15,6 +15,7 @@ import (
 	"github.com/shermanhuman/brandkit/internal/build"
 	"github.com/shermanhuman/brandkit/internal/color"
 	"github.com/shermanhuman/brandkit/internal/dtcg"
+	"github.com/shermanhuman/brandkit/internal/lint"
 )
 
 // Finding is one problem.
@@ -361,6 +362,14 @@ func (c *checker) corners(r *brand.Rules) {
 	}
 	if k.Small > k.Box {
 		c.add("corners", "warning", "", "corners small (%v) is larger than box (%v); small controls usually take the smaller step", k.Small, k.Box)
+	}
+	if _, _, ok := k.ScopeAttr(); !ok {
+		c.add("corners", "error", "", "corners scope %q isn't an attribute selector (%s) or a class (.marketing)", k.Scope, brand.DefaultCornerScope)
+	}
+	for _, g := range k.Pages {
+		if err := lint.ValidGlob(g); err != nil {
+			c.add("corners", "error", "", "corners pages: %v", err)
+		}
 	}
 	if k.Focus == "" {
 		c.add("corners", "warning", "", "corners names no focus colour token; the stepped focus ring falls back to base-content")

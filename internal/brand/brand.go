@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -373,25 +374,65 @@ type Rules struct {
 	// OpacityMin is the lowest opacity modifier (percent) R8 lets through
 	// on a text colour role without a warning (default 70).
 	OpacityMin int `json:"opacityMin,omitempty"`
-	// Corners replaces the radius with pixel-stepped corners.
+	// Corners adds pixel-stepped corners on marketing pages.
 	Corners *Corners `json:"corners,omitempty"`
 }
 
-// Corners is how the brand draws corners. Style "pixel" cuts each corner
-// into a two-step staircase of square pixels: the first row in 2 steps,
-// the second in 1. Small is the step on selector- and field-size
-// components (buttons, badges, fields, checkboxes), Box the step on
-// cards and other large surfaces, both in CSS pixels. Focus is the colour
-// token of the focus ring, which the corners redraw.
+// Corners is how the brand draws corners on marketing pages. Style
+// "pixel" cuts each corner into a two-step staircase of square pixels: the
+// first row in 2 steps, the second in 1. Small is the step on selector-
+// and field-size components (buttons, badges, fields, checkboxes), Box the
+// step on cards and other large surfaces, both in CSS pixels. Focus is the
+// colour token of the focus ring, which the corners redraw.
+//
+// The corners apply only inside Scope, a CSS selector for the container
+// of a marketing page (DefaultCornerScope, set on <html> or <body>).
+// Outside it, product UI keeps the theme's smooth radius. Pages are the
+// path globs of the marketing page sources, relative to the project root,
+// where lint rule R10 flags smooth corners; without them R10 is off.
 type Corners struct {
-	Style string  `json:"style"`
-	Small float64 `json:"small"`
-	Box   float64 `json:"box"`
-	Focus string  `json:"focus,omitempty"`
+	Style string   `json:"style"`
+	Small float64  `json:"small"`
+	Box   float64  `json:"box"`
+	Focus string   `json:"focus,omitempty"`
+	Scope string   `json:"scope,omitempty"`
+	Pages []string `json:"pages,omitempty"`
 }
+
+// DefaultCornerScope is the selector of a marketing page's container when
+// the corners name none.
+const DefaultCornerScope = `[data-corners="pixel"]`
 
 // Pixel reports whether the brand uses pixel-stepped corners.
 func (c *Corners) Pixel() bool { return c != nil && c.Style == "pixel" }
+
+// ScopeSelector is the selector the corners apply inside.
+func (c *Corners) ScopeSelector() string {
+	if c == nil || strings.TrimSpace(c.Scope) == "" {
+		return DefaultCornerScope
+	}
+	return strings.TrimSpace(c.Scope)
+}
+
+var (
+	scopeAttrRe  = regexp.MustCompile(`^\[([a-zA-Z][\w-]*)(?:="([^"]*)")?\]$`)
+	scopeClassRe = regexp.MustCompile(`^\.(-?[a-zA-Z_][\w-]*)$`)
+)
+
+// ScopeAttr is the HTML attribute that puts an element in the corner
+// scope: name and value for an attribute selector ([data-corners="pixel"]
+// or [data-marketing]), or "class" and the class name for a class
+// selector (.marketing). ok is false for any other selector.
+func (c *Corners) ScopeAttr() (name, value string, ok bool) {
+	sc := c.ScopeSelector()
+	if m := scopeAttrRe.FindStringSubmatch(sc); m != nil {
+		return m[1], m[2], true
+	}
+	if m := scopeClassRe.FindStringSubmatch(sc); m != nil {
+		return "class", m[1], true
+	}
+	return "", "", false
+}
 
 // ClearSpace is the lockup's clear-space rule.
 type ClearSpace struct {

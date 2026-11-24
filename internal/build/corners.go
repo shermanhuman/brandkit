@@ -9,10 +9,13 @@ import (
 
 // Pixel-stepped corners.
 //
-// A brand that declares corners {"style": "pixel"} draws every corner as a
-// two-step staircase of square pixels instead of a radius: the first row
-// is inset two pixels, the second one. DaisyUI's radius variables are set
-// to 0 and brand.css cuts the corners with clip-path polygons.
+// A brand that declares corners {"style": "pixel"} draws every corner on
+// its marketing pages as a two-step staircase of square pixels instead of
+// a radius: the first row is inset two pixels, the second one. A marketing
+// page puts the corner scope ([data-corners="pixel"] by default) on its
+// <html> or <body>; inside it, DaisyUI's radius variables are set to 0 and
+// brand.css cuts the corners with clip-path polygons. Outside it, product
+// UI keeps the theme's smooth radius.
 //
 // clip-path also cuts away a CSS border at the corner and anything drawn
 // outside the box, so brand.css draws two things back:
@@ -233,21 +236,60 @@ var joinVariants = []struct {
 	{".join > .join-item:not(:first-child):not(:last-child)", 0},
 }
 
+// splitSelectors splits a selector list at its top-level commas.
+func splitSelectors(list string) []string {
+	var out []string
+	depth, start := 0, 0
+	for i, r := range list {
+		switch r {
+		case '(', '[':
+			depth++
+		case ')', ']':
+			depth--
+		case ',':
+			if depth == 0 {
+				out = append(out, strings.TrimSpace(list[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	return append(out, strings.TrimSpace(list[start:]))
+}
+
+// inScope puts every selector of a list inside the corner scope, without
+// changing its specificity: :where(scope) sel.
+func inScope(scope, list string) string {
+	parts := splitSelectors(list)
+	for i, s := range parts {
+		parts[i] = ":where(" + scope + ") " + s
+	}
+	return strings.Join(parts, ",\n")
+}
+
 // CornersCSS is the part of brand.css that draws pixel-stepped corners,
-// or "" when the brand doesn't use them.
+// or "" when the brand doesn't use them. Every rule applies only inside
+// the corner scope (a marketing page's container); outside it the theme's
+// smooth radius stays.
 func CornersCSS(c *brand.Corners) string {
 	if !c.Pixel() {
 		return ""
 	}
 	sm, lg := c.Small, c.Box
+	scope := c.ScopeSelector()
+	in := func(list string) string { return inScope(scope, list) }
 	var w strings.Builder
 	p := func(format string, a ...any) { fmt.Fprintf(&w, format, a...) }
-	p("\n/* Pixel-stepped corners: %spx steps on selectors and fields, %spx on boxes. DaisyUI's radius\n", brand.Num(sm), brand.Num(lg))
-	p("   variables are 0 and clip-path cuts each corner into two steps. On your own elements, use\n")
-	p("   .px-corners-sm or .px-corners-lg, never rounded-* or border-radius. --px-bw is the width of\n")
-	p("   the stepped outline (0 without a border); --px-focus is the focus ring's colour. */\n")
+	p("\n/* Pixel-stepped corners, for marketing pages only. A marketing page puts\n")
+	p("   %s on its <html> or <body> (or any container); outside it, product UI\n", scope)
+	p("   keeps the smooth radius. Inside it, DaisyUI's radius variables are 0 and clip-path cuts\n")
+	p("   each corner into two steps: %spx on selectors and fields, %spx on boxes. On your own\n", brand.Num(sm), brand.Num(lg))
+	p("   elements there, use .px-corners-sm or .px-corners-lg, never rounded-* or border-radius.\n")
+	p("   --px-bw is the width of the stepped outline (0 without a border); --px-focus is the\n")
+	p("   focus ring's colour. */\n")
 	p("\n@property --px-bw {\n  syntax: \"<length>\";\n  inherits: false;\n  initial-value: 0px;\n}\n")
-	p("\n:root,\n[data-theme] {\n  --radius-selector: 0;\n  --radius-field: 0;\n  --radius-box: 0;\n}\n")
+	// On every element in the scope, so a nested [data-theme] can't bring
+	// its radius back to the components inside it.
+	p("\n%s,\n%s * {\n  --radius-selector: 0;\n  --radius-field: 0;\n  --radius-box: 0;\n}\n", scope, scope)
 	// Positioned, for the ::after outline; in a layer, so DaisyUI's and
 	// Tailwind's own position wins.
 	var hosts []string
@@ -260,36 +302,36 @@ func CornersCSS(c *brand.Corners) string {
 			hosts = append(hosts, h)
 		}
 	}
-	p("\n@layer components {\n  :where(%s) {\n    position: relative;\n  }\n}\n", strings.Join(hosts, ", "))
-	p("\n%s {\n  --px-bw: var(--border, 1px);\n}\n", sels(cornerOutlined, ""))
+	p("\n@layer components {\n  :where(%s) :where(%s) {\n    position: relative;\n  }\n}\n", scope, strings.Join(hosts, ", "))
+	p("\n%s {\n  --px-bw: var(--border, 1px);\n}\n", in(sels(cornerOutlined, "")))
 	all := append(append([]string(nil), cornerSmall...), cornerBox...)
 	for _, u := range cornerBorderUtils {
-		p("\n:is(%s)%s {\n  --px-bw: %s;\n}\n", strings.Join(all, ", "), u.class, u.width)
+		p("\n%s {\n  --px-bw: %s;\n}\n", in(fmt.Sprintf(":is(%s)%s", strings.Join(all, ", "), u.class)), u.width)
 	}
-	p("\n%s {\n  clip-path: %s;\n}\n", sels(cornerSmall, ""), StairClip(sm, cornersAll))
-	p("\n%s {\n  clip-path: %s;\n}\n", sels(cornerBox, ""), StairClip(lg, cornersAll))
+	p("\n%s {\n  clip-path: %s;\n}\n", in(sels(cornerSmall, "")), StairClip(sm, cornersAll))
+	p("\n%s {\n  clip-path: %s;\n}\n", in(sels(cornerBox, "")), StairClip(lg, cornersAll))
 	overlay := func(list []string, u float64) {
-		p("\n%s {\n  --px-bw: inherit;\n  content: \"\";\n  position: absolute;\n  inset: calc(-1 * var(--px-bw));\n  pointer-events: none;\n", sels(list, "::after"))
+		p("\n%s {\n  --px-bw: inherit;\n  content: \"\";\n  position: absolute;\n  inset: calc(-1 * var(--px-bw));\n  pointer-events: none;\n", in(sels(list, "::after")))
 		p("  border-width: calc(%spx + var(--px-bw));\n  border-style: inherit;\n  border-color: inherit;\n  clip-path: %s;\n}\n", brand.Num(2*u), stairBand(u, cornersAll))
 	}
 	overlay(cornerOverlaySmall, sm)
 	overlay(cornerBox, lg)
 	field := func(sel string, u float64, mask int) {
 		img, pos, size := stairFieldLayers(u, mask)
-		p("\n%s {\n  background-image:\n    %s;\n  background-position: %s;\n  background-size: %s;\n  background-repeat: no-repeat;\n  background-origin: border-box;\n}\n", sel, img, pos, size)
+		p("\n%s {\n  background-image:\n    %s;\n  background-position: %s;\n  background-size: %s;\n  background-repeat: no-repeat;\n  background-origin: border-box;\n}\n", in(sel), img, pos, size)
 	}
 	field("input.input,\ntextarea.textarea", sm, cornersAll)
-	p("\n:is(input.input, textarea.textarea):is(:disabled, [disabled]),\nfieldset:disabled :is(input.input, textarea.textarea) {\n  --input-color: var(--color-base-200);\n}\n")
+	p("\n%s {\n  --input-color: var(--color-base-200);\n}\n", in(":is(input.input, textarea.textarea):is(:disabled, [disabled]),\nfieldset:disabled :is(input.input, textarea.textarea)"))
 	focus := func(sel string, u float64, mask int) {
 		p("\n%s {\n  outline: %spx solid var(--px-focus, var(--color-base-content));\n  outline-offset: 0;\n  clip-path: %s;\n}\n",
-			sel, brand.Num(focusGap(u)+focusWidth), stairFocusClip(u, mask))
+			in(sel), brand.Num(focusGap(u)+focusWidth), stairFocusClip(u, mask))
 	}
 	focus(sels(cornerSmall, focusSel), sm, cornersAll)
 	focus(sels(cornerBox, focusSel), lg, cornersAll)
 	p("\n/* Joined items keep their inner corners square. */\n")
 	for _, j := range joinVariants {
-		p("\n%s {\n  clip-path: %s;\n}\n", j.sel, StairClip(sm, j.mask))
-		p("\n%s::after {\n  clip-path: %s;\n}\n", j.sel, stairBand(sm, j.mask))
+		p("\n%s {\n  clip-path: %s;\n}\n", in(j.sel), StairClip(sm, j.mask))
+		p("\n%s {\n  clip-path: %s;\n}\n", in(j.sel+"::after"), stairBand(sm, j.mask))
 		field(fmt.Sprintf("%s:is(input.input, textarea.textarea)", j.sel), sm, j.mask)
 		focus(j.sel+focusSel, sm, j.mask)
 	}

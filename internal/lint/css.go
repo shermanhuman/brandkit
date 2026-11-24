@@ -260,8 +260,8 @@ func (l *linter) decl(prop, val string, off int, w where, focus bool, text strin
 		l.add(off, colourRule, "error", text, "%s", colourMsg)
 		return
 	}
-	if l.cfg.Corners == "pixel" && radiusPropRe.MatchString(prop) && !squareRadius(val) {
-		l.add(off, "R10", "error", text, "border-radius; the brand's corners are pixel-stepped (use px-corners-sm or px-corners-lg)")
+	if l.corners && radiusPropRe.MatchString(prop) && !squareRadius(val) {
+		l.add(off, "R10", "error", text, "border-radius on a marketing page; the brand's corners are pixel-stepped there (use px-corners-sm or px-corners-lg)")
 		return
 	}
 	switch {

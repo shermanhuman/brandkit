@@ -68,10 +68,13 @@
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* Pixel-stepped corners: 2px steps on selectors and fields, 4px on boxes. DaisyUI's radius
-   variables are 0 and clip-path cuts each corner into two steps. On your own elements, use
-   .px-corners-sm or .px-corners-lg, never rounded-* or border-radius. --px-bw is the width of
-   the stepped outline (0 without a border); --px-focus is the focus ring's colour. */
+/* Pixel-stepped corners, for marketing pages only. A marketing page puts
+   [data-corners="pixel"] on its <html> or <body> (or any container); outside it, product UI
+   keeps the smooth radius. Inside it, DaisyUI's radius variables are 0 and clip-path cuts
+   each corner into two steps: 2px on selectors and fields, 4px on boxes. On your own
+   elements there, use .px-corners-sm or .px-corners-lg, never rounded-* or border-radius.
+   --px-bw is the width of the stepped outline (0 without a border); --px-focus is the
+   focus ring's colour. */
 
 @property --px-bw {
   syntax: "<length>";
@@ -79,84 +82,84 @@
   initial-value: 0px;
 }
 
-:root,
-[data-theme] {
+[data-corners="pixel"],
+[data-corners="pixel"] * {
   --radius-selector: 0;
   --radius-field: 0;
   --radius-box: 0;
 }
 
 @layer components {
-  :where(.btn:not(input), .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .px-corners-sm, .card, .modal-box, .alert, .menu:not(.dropdown-content), .collapse, .px-corners-lg) {
+  :where([data-corners="pixel"]) :where(.btn:not(input), .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .px-corners-sm, .card, .modal-box, .alert, .menu:not(.dropdown-content), .collapse, .px-corners-lg) {
     position: relative;
   }
 }
 
-.btn,
-.badge,
-.input,
-.select,
-.textarea,
-.checkbox,
-.toggle,
-.kbd,
-.alert,
-.card-border {
+:where([data-corners="pixel"]) .btn,
+:where([data-corners="pixel"]) .badge,
+:where([data-corners="pixel"]) .input,
+:where([data-corners="pixel"]) .select,
+:where([data-corners="pixel"]) .textarea,
+:where([data-corners="pixel"]) .checkbox,
+:where([data-corners="pixel"]) .toggle,
+:where([data-corners="pixel"]) .kbd,
+:where([data-corners="pixel"]) .alert,
+:where([data-corners="pixel"]) .card-border {
   --px-bw: var(--border, 1px);
 }
 
-:is(.btn, .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .tabs-box > .tab, .px-corners-sm, .card, .modal-box, .alert, .dropdown-content, .menu, .collapse, .px-corners-lg).border {
+:where([data-corners="pixel"]) :is(.btn, .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .tabs-box > .tab, .px-corners-sm, .card, .modal-box, .alert, .dropdown-content, .menu, .collapse, .px-corners-lg).border {
   --px-bw: 1px;
 }
 
-:is(.btn, .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .tabs-box > .tab, .px-corners-sm, .card, .modal-box, .alert, .dropdown-content, .menu, .collapse, .px-corners-lg).border-0 {
+:where([data-corners="pixel"]) :is(.btn, .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .tabs-box > .tab, .px-corners-sm, .card, .modal-box, .alert, .dropdown-content, .menu, .collapse, .px-corners-lg).border-0 {
   --px-bw: 0px;
 }
 
-:is(.btn, .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .tabs-box > .tab, .px-corners-sm, .card, .modal-box, .alert, .dropdown-content, .menu, .collapse, .px-corners-lg).border-2 {
+:where([data-corners="pixel"]) :is(.btn, .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .tabs-box > .tab, .px-corners-sm, .card, .modal-box, .alert, .dropdown-content, .menu, .collapse, .px-corners-lg).border-2 {
   --px-bw: 2px;
 }
 
-:is(.btn, .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .tabs-box > .tab, .px-corners-sm, .card, .modal-box, .alert, .dropdown-content, .menu, .collapse, .px-corners-lg).border-4 {
+:where([data-corners="pixel"]) :is(.btn, .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .tabs-box > .tab, .px-corners-sm, .card, .modal-box, .alert, .dropdown-content, .menu, .collapse, .px-corners-lg).border-4 {
   --px-bw: 4px;
 }
 
-:is(.btn, .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .tabs-box > .tab, .px-corners-sm, .card, .modal-box, .alert, .dropdown-content, .menu, .collapse, .px-corners-lg).border-8 {
+:where([data-corners="pixel"]) :is(.btn, .badge, .input, .select, .textarea, .checkbox, .toggle, .kbd, .tabs-box > .tab, .px-corners-sm, .card, .modal-box, .alert, .dropdown-content, .menu, .collapse, .px-corners-lg).border-8 {
   --px-bw: 8px;
 }
 
-.btn,
-.badge,
-.input,
-.select,
-.textarea,
-.checkbox,
-.toggle,
-.kbd,
-.tabs-box > .tab,
-.px-corners-sm {
+:where([data-corners="pixel"]) .btn,
+:where([data-corners="pixel"]) .badge,
+:where([data-corners="pixel"]) .input,
+:where([data-corners="pixel"]) .select,
+:where([data-corners="pixel"]) .textarea,
+:where([data-corners="pixel"]) .checkbox,
+:where([data-corners="pixel"]) .toggle,
+:where([data-corners="pixel"]) .kbd,
+:where([data-corners="pixel"]) .tabs-box > .tab,
+:where([data-corners="pixel"]) .px-corners-sm {
   clip-path: polygon(0 50%, 0 4px, 2px 4px, 2px 2px, 4px 2px, 4px 0, calc(100% - 4px) 0, calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 2px) calc(100% - 4px), calc(100% - 2px) calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 4px), 0 calc(100% - 4px), 0 50%);
 }
 
-.card,
-.modal-box,
-.alert,
-.dropdown-content,
-.menu,
-.collapse,
-.px-corners-lg {
+:where([data-corners="pixel"]) .card,
+:where([data-corners="pixel"]) .modal-box,
+:where([data-corners="pixel"]) .alert,
+:where([data-corners="pixel"]) .dropdown-content,
+:where([data-corners="pixel"]) .menu,
+:where([data-corners="pixel"]) .collapse,
+:where([data-corners="pixel"]) .px-corners-lg {
   clip-path: polygon(0 50%, 0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0, calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px, 100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%, 8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px), 0 50%);
 }
 
-.btn:not(input)::after,
-.badge::after,
-.input::after,
-.select::after,
-.textarea::after,
-.checkbox::after,
-.toggle::after,
-.kbd::after,
-.px-corners-sm::after {
+:where([data-corners="pixel"]) .btn:not(input)::after,
+:where([data-corners="pixel"]) .badge::after,
+:where([data-corners="pixel"]) .input::after,
+:where([data-corners="pixel"]) .select::after,
+:where([data-corners="pixel"]) .textarea::after,
+:where([data-corners="pixel"]) .checkbox::after,
+:where([data-corners="pixel"]) .toggle::after,
+:where([data-corners="pixel"]) .kbd::after,
+:where([data-corners="pixel"]) .px-corners-sm::after {
   --px-bw: inherit;
   content: "";
   position: absolute;
@@ -168,13 +171,13 @@
   clip-path: polygon(evenodd, var(--px-bw) 50%, var(--px-bw) 4px, 2px 4px, 2px 2px, 4px 2px, 4px var(--px-bw), calc(100% - 4px) var(--px-bw), calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 4px, calc(100% - var(--px-bw)) 4px, calc(100% - var(--px-bw)) calc(100% - 4px), calc(100% - 2px) calc(100% - 4px), calc(100% - 2px) calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) calc(100% - var(--px-bw)), 4px calc(100% - var(--px-bw)), 4px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 4px), var(--px-bw) calc(100% - 4px), var(--px-bw) 50%, var(--px-bw) 50%, var(--px-bw) calc(4px + var(--px-bw)), calc(2px + var(--px-bw)) calc(4px + var(--px-bw)), calc(2px + var(--px-bw)) calc(2px + var(--px-bw)), calc(4px + var(--px-bw)) calc(2px + var(--px-bw)), calc(4px + var(--px-bw)) var(--px-bw), calc(100% - 4px - var(--px-bw)) var(--px-bw), calc(100% - 4px - var(--px-bw)) calc(2px + var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(2px + var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(4px + var(--px-bw)), calc(100% - var(--px-bw)) calc(4px + var(--px-bw)), calc(100% - var(--px-bw)) calc(100% - 4px - var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(100% - 4px - var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(100% - 4px - var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(100% - 4px - var(--px-bw)) calc(100% - var(--px-bw)), calc(4px + var(--px-bw)) calc(100% - var(--px-bw)), calc(4px + var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(2px + var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(2px + var(--px-bw)) calc(100% - 4px - var(--px-bw)), var(--px-bw) calc(100% - 4px - var(--px-bw)), var(--px-bw) 50%);
 }
 
-.card::after,
-.modal-box::after,
-.alert::after,
-.dropdown-content::after,
-.menu::after,
-.collapse::after,
-.px-corners-lg::after {
+:where([data-corners="pixel"]) .card::after,
+:where([data-corners="pixel"]) .modal-box::after,
+:where([data-corners="pixel"]) .alert::after,
+:where([data-corners="pixel"]) .dropdown-content::after,
+:where([data-corners="pixel"]) .menu::after,
+:where([data-corners="pixel"]) .collapse::after,
+:where([data-corners="pixel"]) .px-corners-lg::after {
   --px-bw: inherit;
   content: "";
   position: absolute;
@@ -186,8 +189,8 @@
   clip-path: polygon(evenodd, var(--px-bw) 50%, var(--px-bw) 8px, 4px 8px, 4px 4px, 8px 4px, 8px var(--px-bw), calc(100% - 8px) var(--px-bw), calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, calc(100% - var(--px-bw)) 8px, calc(100% - var(--px-bw)) calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) calc(100% - var(--px-bw)), 8px calc(100% - var(--px-bw)), 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), var(--px-bw) calc(100% - 8px), var(--px-bw) 50%, var(--px-bw) 50%, var(--px-bw) calc(8px + var(--px-bw)), calc(4px + var(--px-bw)) calc(8px + var(--px-bw)), calc(4px + var(--px-bw)) calc(4px + var(--px-bw)), calc(8px + var(--px-bw)) calc(4px + var(--px-bw)), calc(8px + var(--px-bw)) var(--px-bw), calc(100% - 8px - var(--px-bw)) var(--px-bw), calc(100% - 8px - var(--px-bw)) calc(4px + var(--px-bw)), calc(100% - 4px - var(--px-bw)) calc(4px + var(--px-bw)), calc(100% - 4px - var(--px-bw)) calc(8px + var(--px-bw)), calc(100% - var(--px-bw)) calc(8px + var(--px-bw)), calc(100% - var(--px-bw)) calc(100% - 8px - var(--px-bw)), calc(100% - 4px - var(--px-bw)) calc(100% - 8px - var(--px-bw)), calc(100% - 4px - var(--px-bw)) calc(100% - 4px - var(--px-bw)), calc(100% - 8px - var(--px-bw)) calc(100% - 4px - var(--px-bw)), calc(100% - 8px - var(--px-bw)) calc(100% - var(--px-bw)), calc(8px + var(--px-bw)) calc(100% - var(--px-bw)), calc(8px + var(--px-bw)) calc(100% - 4px - var(--px-bw)), calc(4px + var(--px-bw)) calc(100% - 4px - var(--px-bw)), calc(4px + var(--px-bw)) calc(100% - 8px - var(--px-bw)), var(--px-bw) calc(100% - 8px - var(--px-bw)), var(--px-bw) 50%);
 }
 
-input.input,
-textarea.textarea {
+:where([data-corners="pixel"]) input.input,
+:where([data-corners="pixel"]) textarea.textarea {
   background-image:
     linear-gradient(var(--input-color), var(--input-color)),
     linear-gradient(var(--input-color), var(--input-color)),
@@ -211,33 +214,33 @@ textarea.textarea {
   background-origin: border-box;
 }
 
-:is(input.input, textarea.textarea):is(:disabled, [disabled]),
-fieldset:disabled :is(input.input, textarea.textarea) {
+:where([data-corners="pixel"]) :is(input.input, textarea.textarea):is(:disabled, [disabled]),
+:where([data-corners="pixel"]) fieldset:disabled :is(input.input, textarea.textarea) {
   --input-color: var(--color-base-200);
 }
 
-.btn:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.badge:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.input:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.select:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.textarea:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.checkbox:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.toggle:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.kbd:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.tabs-box > .tab:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.px-corners-sm:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
+:where([data-corners="pixel"]) .btn:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .badge:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .input:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .select:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .textarea:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .checkbox:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .toggle:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .kbd:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .tabs-box > .tab:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .px-corners-sm:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
   outline: 4px solid var(--px-focus, var(--color-base-content));
   outline-offset: 0;
   clip-path: polygon(evenodd, -4px 50%, -4px 0, -2px 0, -2px -2px, 0 -2px, 0 -4px, 100% -4px, 100% -2px, calc(100% + 2px) -2px, calc(100% + 2px) 0, calc(100% + 4px) 0, calc(100% + 4px) 100%, calc(100% + 2px) 100%, calc(100% + 2px) calc(100% + 2px), 100% calc(100% + 2px), 100% calc(100% + 4px), 0 calc(100% + 4px), 0 calc(100% + 2px), -2px calc(100% + 2px), -2px 100%, -4px 100%, -4px 50%, -2px 50%, -2px 2px, 0 2px, 0 0, 2px 0, 2px -2px, calc(100% - 2px) -2px, calc(100% - 2px) 0, 100% 0, 100% 2px, calc(100% + 2px) 2px, calc(100% + 2px) calc(100% - 2px), 100% calc(100% - 2px), 100% 100%, calc(100% - 2px) 100%, calc(100% - 2px) calc(100% + 2px), 2px calc(100% + 2px), 2px 100%, 0 100%, 0 calc(100% - 2px), -2px calc(100% - 2px), -2px 50%, 0 50%, 0 4px, 2px 4px, 2px 2px, 4px 2px, 4px 0, calc(100% - 4px) 0, calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 2px) calc(100% - 4px), calc(100% - 2px) calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 4px), 0 calc(100% - 4px), 0 50%);
 }
 
-.card:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.modal-box:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.alert:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.dropdown-content:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.menu:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.collapse:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
-.px-corners-lg:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
+:where([data-corners="pixel"]) .card:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .modal-box:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .alert:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .dropdown-content:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .menu:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .collapse:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open),
+:where([data-corners="pixel"]) .px-corners-lg:is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
   outline: 6px solid var(--px-focus, var(--color-base-content));
   outline-offset: 0;
   clip-path: polygon(evenodd, -6px 50%, -6px 2px, -2px 2px, -2px -2px, 2px -2px, 2px -6px, calc(100% - 2px) -6px, calc(100% - 2px) -2px, calc(100% + 2px) -2px, calc(100% + 2px) 2px, calc(100% + 6px) 2px, calc(100% + 6px) calc(100% - 2px), calc(100% + 2px) calc(100% - 2px), calc(100% + 2px) calc(100% + 2px), calc(100% - 2px) calc(100% + 2px), calc(100% - 2px) calc(100% + 6px), 2px calc(100% + 6px), 2px calc(100% + 2px), -2px calc(100% + 2px), -2px calc(100% - 2px), -6px calc(100% - 2px), -6px 50%, -4px 50%, -4px 4px, 0 4px, 0 0, 4px 0, 4px -4px, calc(100% - 4px) -4px, calc(100% - 4px) 0, 100% 0, 100% 4px, calc(100% + 4px) 4px, calc(100% + 4px) calc(100% - 4px), 100% calc(100% - 4px), 100% 100%, calc(100% - 4px) 100%, calc(100% - 4px) calc(100% + 4px), 4px calc(100% + 4px), 4px 100%, 0 100%, 0 calc(100% - 4px), -4px calc(100% - 4px), -4px 50%, 0 50%, 0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0, calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px, 100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%, 8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px), 0 50%);
@@ -245,15 +248,15 @@ fieldset:disabled :is(input.input, textarea.textarea) {
 
 /* Joined items keep their inner corners square. */
 
-.join:not(.join-vertical) > .join-item:first-child:not(:last-child) {
+:where([data-corners="pixel"]) .join:not(.join-vertical) > .join-item:first-child:not(:last-child) {
   clip-path: polygon(0 50%, 0 4px, 2px 4px, 2px 2px, 4px 2px, 4px 0, 100% 0, 100% 100%, 4px 100%, 4px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 4px), 0 calc(100% - 4px), 0 50%);
 }
 
-.join:not(.join-vertical) > .join-item:first-child:not(:last-child)::after {
+:where([data-corners="pixel"]) .join:not(.join-vertical) > .join-item:first-child:not(:last-child)::after {
   clip-path: polygon(evenodd, var(--px-bw) 50%, var(--px-bw) 4px, 2px 4px, 2px 2px, 4px 2px, 4px var(--px-bw), calc(100% - var(--px-bw)) var(--px-bw), calc(100% - var(--px-bw)) calc(100% - var(--px-bw)), 4px calc(100% - var(--px-bw)), 4px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 4px), var(--px-bw) calc(100% - 4px), var(--px-bw) 50%, var(--px-bw) 50%, var(--px-bw) calc(4px + var(--px-bw)), calc(2px + var(--px-bw)) calc(4px + var(--px-bw)), calc(2px + var(--px-bw)) calc(2px + var(--px-bw)), calc(4px + var(--px-bw)) calc(2px + var(--px-bw)), calc(4px + var(--px-bw)) var(--px-bw), calc(100% - var(--px-bw)) var(--px-bw), calc(100% - var(--px-bw)) calc(100% - var(--px-bw)), calc(4px + var(--px-bw)) calc(100% - var(--px-bw)), calc(4px + var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(2px + var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(2px + var(--px-bw)) calc(100% - 4px - var(--px-bw)), var(--px-bw) calc(100% - 4px - var(--px-bw)), var(--px-bw) 50%);
 }
 
-.join:not(.join-vertical) > .join-item:first-child:not(:last-child):is(input.input, textarea.textarea) {
+:where([data-corners="pixel"]) .join:not(.join-vertical) > .join-item:first-child:not(:last-child):is(input.input, textarea.textarea) {
   background-image:
     linear-gradient(var(--input-color), var(--input-color)),
     linear-gradient(var(--input-color), var(--input-color)),
@@ -269,21 +272,21 @@ fieldset:disabled :is(input.input, textarea.textarea) {
   background-origin: border-box;
 }
 
-.join:not(.join-vertical) > .join-item:first-child:not(:last-child):is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
+:where([data-corners="pixel"]) .join:not(.join-vertical) > .join-item:first-child:not(:last-child):is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
   outline: 4px solid var(--px-focus, var(--color-base-content));
   outline-offset: 0;
   clip-path: polygon(evenodd, -4px 50%, -4px 0, -2px 0, -2px -2px, 0 -2px, 0 -4px, calc(100% + 4px) -4px, calc(100% + 4px) calc(100% + 4px), 0 calc(100% + 4px), 0 calc(100% + 2px), -2px calc(100% + 2px), -2px 100%, -4px 100%, -4px 50%, -2px 50%, -2px 2px, 0 2px, 0 0, 2px 0, 2px -2px, calc(100% + 2px) -2px, calc(100% + 2px) calc(100% + 2px), 2px calc(100% + 2px), 2px 100%, 0 100%, 0 calc(100% - 2px), -2px calc(100% - 2px), -2px 50%, 0 50%, 0 4px, 2px 4px, 2px 2px, 4px 2px, 4px 0, 100% 0, 100% 100%, 4px 100%, 4px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 4px), 0 calc(100% - 4px), 0 50%);
 }
 
-.join:not(.join-vertical) > .join-item:last-child:not(:first-child) {
+:where([data-corners="pixel"]) .join:not(.join-vertical) > .join-item:last-child:not(:first-child) {
   clip-path: polygon(0 50%, 0 0, calc(100% - 4px) 0, calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 2px) calc(100% - 4px), calc(100% - 2px) calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) 100%, 0 100%, 0 50%);
 }
 
-.join:not(.join-vertical) > .join-item:last-child:not(:first-child)::after {
+:where([data-corners="pixel"]) .join:not(.join-vertical) > .join-item:last-child:not(:first-child)::after {
   clip-path: polygon(evenodd, var(--px-bw) 50%, var(--px-bw) var(--px-bw), calc(100% - 4px) var(--px-bw), calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 4px, calc(100% - var(--px-bw)) 4px, calc(100% - var(--px-bw)) calc(100% - 4px), calc(100% - 2px) calc(100% - 4px), calc(100% - 2px) calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) calc(100% - var(--px-bw)), var(--px-bw) calc(100% - var(--px-bw)), var(--px-bw) 50%, var(--px-bw) 50%, var(--px-bw) var(--px-bw), calc(100% - 4px - var(--px-bw)) var(--px-bw), calc(100% - 4px - var(--px-bw)) calc(2px + var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(2px + var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(4px + var(--px-bw)), calc(100% - var(--px-bw)) calc(4px + var(--px-bw)), calc(100% - var(--px-bw)) calc(100% - 4px - var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(100% - 4px - var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(100% - 4px - var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(100% - 4px - var(--px-bw)) calc(100% - var(--px-bw)), var(--px-bw) calc(100% - var(--px-bw)), var(--px-bw) 50%);
 }
 
-.join:not(.join-vertical) > .join-item:last-child:not(:first-child):is(input.input, textarea.textarea) {
+:where([data-corners="pixel"]) .join:not(.join-vertical) > .join-item:last-child:not(:first-child):is(input.input, textarea.textarea) {
   background-image:
     linear-gradient(var(--input-color), var(--input-color)),
     linear-gradient(var(--input-color), var(--input-color)),
@@ -299,21 +302,21 @@ fieldset:disabled :is(input.input, textarea.textarea) {
   background-origin: border-box;
 }
 
-.join:not(.join-vertical) > .join-item:last-child:not(:first-child):is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
+:where([data-corners="pixel"]) .join:not(.join-vertical) > .join-item:last-child:not(:first-child):is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
   outline: 4px solid var(--px-focus, var(--color-base-content));
   outline-offset: 0;
   clip-path: polygon(evenodd, -4px 50%, -4px -4px, 100% -4px, 100% -2px, calc(100% + 2px) -2px, calc(100% + 2px) 0, calc(100% + 4px) 0, calc(100% + 4px) 100%, calc(100% + 2px) 100%, calc(100% + 2px) calc(100% + 2px), 100% calc(100% + 2px), 100% calc(100% + 4px), -4px calc(100% + 4px), -4px 50%, -2px 50%, -2px -2px, calc(100% - 2px) -2px, calc(100% - 2px) 0, 100% 0, 100% 2px, calc(100% + 2px) 2px, calc(100% + 2px) calc(100% - 2px), 100% calc(100% - 2px), 100% 100%, calc(100% - 2px) 100%, calc(100% - 2px) calc(100% + 2px), -2px calc(100% + 2px), -2px 50%, 0 50%, 0 0, calc(100% - 4px) 0, calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 2px) calc(100% - 4px), calc(100% - 2px) calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) 100%, 0 100%, 0 50%);
 }
 
-.join-vertical > .join-item:first-child:not(:last-child) {
+:where([data-corners="pixel"]) .join-vertical > .join-item:first-child:not(:last-child) {
   clip-path: polygon(0 50%, 0 4px, 2px 4px, 2px 2px, 4px 2px, 4px 0, calc(100% - 4px) 0, calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 4px, 100% 4px, 100% 100%, 0 100%, 0 50%);
 }
 
-.join-vertical > .join-item:first-child:not(:last-child)::after {
+:where([data-corners="pixel"]) .join-vertical > .join-item:first-child:not(:last-child)::after {
   clip-path: polygon(evenodd, var(--px-bw) 50%, var(--px-bw) 4px, 2px 4px, 2px 2px, 4px 2px, 4px var(--px-bw), calc(100% - 4px) var(--px-bw), calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 4px, calc(100% - var(--px-bw)) 4px, calc(100% - var(--px-bw)) calc(100% - var(--px-bw)), var(--px-bw) calc(100% - var(--px-bw)), var(--px-bw) 50%, var(--px-bw) 50%, var(--px-bw) calc(4px + var(--px-bw)), calc(2px + var(--px-bw)) calc(4px + var(--px-bw)), calc(2px + var(--px-bw)) calc(2px + var(--px-bw)), calc(4px + var(--px-bw)) calc(2px + var(--px-bw)), calc(4px + var(--px-bw)) var(--px-bw), calc(100% - 4px - var(--px-bw)) var(--px-bw), calc(100% - 4px - var(--px-bw)) calc(2px + var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(2px + var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(4px + var(--px-bw)), calc(100% - var(--px-bw)) calc(4px + var(--px-bw)), calc(100% - var(--px-bw)) calc(100% - var(--px-bw)), var(--px-bw) calc(100% - var(--px-bw)), var(--px-bw) 50%);
 }
 
-.join-vertical > .join-item:first-child:not(:last-child):is(input.input, textarea.textarea) {
+:where([data-corners="pixel"]) .join-vertical > .join-item:first-child:not(:last-child):is(input.input, textarea.textarea) {
   background-image:
     linear-gradient(var(--input-color), var(--input-color)),
     linear-gradient(var(--input-color), var(--input-color)),
@@ -329,21 +332,21 @@ fieldset:disabled :is(input.input, textarea.textarea) {
   background-origin: border-box;
 }
 
-.join-vertical > .join-item:first-child:not(:last-child):is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
+:where([data-corners="pixel"]) .join-vertical > .join-item:first-child:not(:last-child):is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
   outline: 4px solid var(--px-focus, var(--color-base-content));
   outline-offset: 0;
   clip-path: polygon(evenodd, -4px 50%, -4px 0, -2px 0, -2px -2px, 0 -2px, 0 -4px, 100% -4px, 100% -2px, calc(100% + 2px) -2px, calc(100% + 2px) 0, calc(100% + 4px) 0, calc(100% + 4px) calc(100% + 4px), -4px calc(100% + 4px), -4px 50%, -2px 50%, -2px 2px, 0 2px, 0 0, 2px 0, 2px -2px, calc(100% - 2px) -2px, calc(100% - 2px) 0, 100% 0, 100% 2px, calc(100% + 2px) 2px, calc(100% + 2px) calc(100% + 2px), -2px calc(100% + 2px), -2px 50%, 0 50%, 0 4px, 2px 4px, 2px 2px, 4px 2px, 4px 0, calc(100% - 4px) 0, calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 4px, 100% 4px, 100% 100%, 0 100%, 0 50%);
 }
 
-.join-vertical > .join-item:last-child:not(:first-child) {
+:where([data-corners="pixel"]) .join-vertical > .join-item:last-child:not(:first-child) {
   clip-path: polygon(0 50%, 0 0, 100% 0, 100% calc(100% - 4px), calc(100% - 2px) calc(100% - 4px), calc(100% - 2px) calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 4px), 0 calc(100% - 4px), 0 50%);
 }
 
-.join-vertical > .join-item:last-child:not(:first-child)::after {
+:where([data-corners="pixel"]) .join-vertical > .join-item:last-child:not(:first-child)::after {
   clip-path: polygon(evenodd, var(--px-bw) 50%, var(--px-bw) var(--px-bw), calc(100% - var(--px-bw)) var(--px-bw), calc(100% - var(--px-bw)) calc(100% - 4px), calc(100% - 2px) calc(100% - 4px), calc(100% - 2px) calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) calc(100% - var(--px-bw)), 4px calc(100% - var(--px-bw)), 4px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 4px), var(--px-bw) calc(100% - 4px), var(--px-bw) 50%, var(--px-bw) 50%, var(--px-bw) var(--px-bw), calc(100% - var(--px-bw)) var(--px-bw), calc(100% - var(--px-bw)) calc(100% - 4px - var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(100% - 4px - var(--px-bw)), calc(100% - 2px - var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(100% - 4px - var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(100% - 4px - var(--px-bw)) calc(100% - var(--px-bw)), calc(4px + var(--px-bw)) calc(100% - var(--px-bw)), calc(4px + var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(2px + var(--px-bw)) calc(100% - 2px - var(--px-bw)), calc(2px + var(--px-bw)) calc(100% - 4px - var(--px-bw)), var(--px-bw) calc(100% - 4px - var(--px-bw)), var(--px-bw) 50%);
 }
 
-.join-vertical > .join-item:last-child:not(:first-child):is(input.input, textarea.textarea) {
+:where([data-corners="pixel"]) .join-vertical > .join-item:last-child:not(:first-child):is(input.input, textarea.textarea) {
   background-image:
     linear-gradient(var(--input-color), var(--input-color)),
     linear-gradient(var(--input-color), var(--input-color)),
@@ -359,21 +362,21 @@ fieldset:disabled :is(input.input, textarea.textarea) {
   background-origin: border-box;
 }
 
-.join-vertical > .join-item:last-child:not(:first-child):is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
+:where([data-corners="pixel"]) .join-vertical > .join-item:last-child:not(:first-child):is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
   outline: 4px solid var(--px-focus, var(--color-base-content));
   outline-offset: 0;
   clip-path: polygon(evenodd, -4px 50%, -4px -4px, calc(100% + 4px) -4px, calc(100% + 4px) 100%, calc(100% + 2px) 100%, calc(100% + 2px) calc(100% + 2px), 100% calc(100% + 2px), 100% calc(100% + 4px), 0 calc(100% + 4px), 0 calc(100% + 2px), -2px calc(100% + 2px), -2px 100%, -4px 100%, -4px 50%, -2px 50%, -2px -2px, calc(100% + 2px) -2px, calc(100% + 2px) calc(100% - 2px), 100% calc(100% - 2px), 100% 100%, calc(100% - 2px) 100%, calc(100% - 2px) calc(100% + 2px), 2px calc(100% + 2px), 2px 100%, 0 100%, 0 calc(100% - 2px), -2px calc(100% - 2px), -2px 50%, 0 50%, 0 0, 100% 0, 100% calc(100% - 4px), calc(100% - 2px) calc(100% - 4px), calc(100% - 2px) calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 4px), 0 calc(100% - 4px), 0 50%);
 }
 
-.join > .join-item:not(:first-child):not(:last-child) {
+:where([data-corners="pixel"]) .join > .join-item:not(:first-child):not(:last-child) {
   clip-path: polygon(0 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 50%);
 }
 
-.join > .join-item:not(:first-child):not(:last-child)::after {
+:where([data-corners="pixel"]) .join > .join-item:not(:first-child):not(:last-child)::after {
   clip-path: polygon(evenodd, var(--px-bw) 50%, var(--px-bw) var(--px-bw), calc(100% - var(--px-bw)) var(--px-bw), calc(100% - var(--px-bw)) calc(100% - var(--px-bw)), var(--px-bw) calc(100% - var(--px-bw)), var(--px-bw) 50%, var(--px-bw) 50%, var(--px-bw) var(--px-bw), calc(100% - var(--px-bw)) var(--px-bw), calc(100% - var(--px-bw)) calc(100% - var(--px-bw)), var(--px-bw) calc(100% - var(--px-bw)), var(--px-bw) 50%);
 }
 
-.join > .join-item:not(:first-child):not(:last-child):is(input.input, textarea.textarea) {
+:where([data-corners="pixel"]) .join > .join-item:not(:first-child):not(:last-child):is(input.input, textarea.textarea) {
   background-image:
     none;
   background-position: 0 0;
@@ -382,7 +385,7 @@ fieldset:disabled :is(input.input, textarea.textarea) {
   background-origin: border-box;
 }
 
-.join > .join-item:not(:first-child):not(:last-child):is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
+:where([data-corners="pixel"]) .join > .join-item:not(:first-child):not(:last-child):is(:focus-visible, :is(.input, .select, .textarea):is(:focus, :focus-within), .select:open) {
   outline: 4px solid var(--px-focus, var(--color-base-content));
   outline-offset: 0;
   clip-path: polygon(evenodd, -4px 50%, -4px -4px, calc(100% + 4px) -4px, calc(100% + 4px) calc(100% + 4px), -4px calc(100% + 4px), -4px 50%, -2px 50%, -2px -2px, calc(100% + 2px) -2px, calc(100% + 2px) calc(100% + 2px), -2px calc(100% + 2px), -2px 50%, 0 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 50%);

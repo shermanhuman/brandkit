@@ -300,6 +300,8 @@ func cmdLint(args []string, stdin io.Reader, out io.Writer) (int, error) {
 	if len(pos) == 0 && len(compiled) == 0 {
 		pos = []string{"."}
 	}
+	// R10's marketing page globs are relative to the project root.
+	cfg.Root = project
 	res, err := lint.Paths(cfg, pos, compiled)
 	if err != nil {
 		return 0, err
