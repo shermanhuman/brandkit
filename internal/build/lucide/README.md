@@ -24,4 +24,4 @@ Source code: https://github.com/lucide-icons/lucide
 | `x.svg` | `3e5a6772bb12937764510fc266c8d27e862c8990e7076a8fda209aee5e8a1479` |
 
 brandkit embeds these files and draws them into the README brand sheet's `icons.svg` for a brand whose icon set is Lucide. `house` is Lucide's name for "home"; `pencil` is its "edit".
-To move to another release, copy the same files from the new package and update this table and the version in `internal/build/icons.go`.
+To move to another release, copy the same files from the new package and update this table and `LucideVersion` in `internal/build/sheetart.go`.
