@@ -425,8 +425,11 @@ func checkCorners(t *testing.T, dir string, fc color.RGBA, radius map[string]flo
 	}
 	for _, bx := range pixel {
 		u, w, h := bx.u, bx.w, bx.h
-		border := at(img, bx.x, bx.y+h/2)
-		if near(border, green) || near(border, at(img, bx.x+w/2, bx.y+h/2)) {
+		// The fill is read just inside the left border, clear of the
+		// steps and of the label: an outline button's label is the
+		// outline's colour, and where its glyphs fall depends on the font.
+		border, fill := at(img, bx.x, bx.y+h/2), at(img, bx.x+2*u+2, bx.y+h/2)
+		if near(border, green) || near(border, fill) {
 			t.Fatalf("%s: no visible border to compare with (%v)", bx.id, border)
 		}
 		for _, p := range [][2]int{{0, 0}, {2*u - 1, 0}, {0, 2*u - 1}, {u - 1, u}, {u, u - 1}, {w - 1, h - 1}, {w - 2*u, h - 1}, {w - 1, h - 2*u}, {w - u, h - u - 1}} {
