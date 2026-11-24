@@ -35,7 +35,7 @@ Work in the package's own folder or repository. Where it lives (a new repository
 2. **Tokens**, split as the fixtures split them: primitives (the raw palette, font families, scales), semantic roles that alias primitives, and one file per theme context. Colours are OKLCH with the source's displayed hex kept in the `hex` field, so a consumer that reads hex sees exactly what it saw before. Two sources whose hex values differ at all are a conflict, however close they look.
 3. **Resolver:** one set per layer and a `theme` modifier with one context per theme.
 4. **Extending another brand:** run `brandkit install owner/base@tag` in this package (the files land in `vendor/brand/<base>/`, pinned in `brandkit.lock`; the base's `install` list must include `tokens`) and list the vendored token files first in each resolver set and context. This brand's own files come after them and win. Override only what differs; never copy the base's values into this package. Add `vendor` to this package's `install` list, so projects that install it also get the base's fonts and assets. (The `sub` fixture refers to `vendor/fixture-base/` because it vendors by hand; an installed base is under `vendor/brand/`.)
-5. **Rules** in the token files' root `$extensions` (the keys are in the README's *Token extensions*): the DaisyUI role mapping, contrast pairs with their minimum and use, the accent and the body-text tokens it may never be, shadows, the mark and lockup per theme, clear space, the icon set, the scales, do and don't.
+5. **Rules** in the token files' root `$extensions` (the keys are in the README's *Token extensions*): the DaisyUI role mapping, contrast pairs with their minimum and use, the accent and the body-text tokens it may never be, shadows, the mark and lockup per theme, clear space, the icon set, the scales, the corner style (`corners`, when the brand draws pixel-stepped corners instead of a radius), do and don't.
 6. Fill each value from the source the conflict table favours. Set every value still open to the string `"TODO"`, the open-value marker: `check` fails on any `"TODO"`, so nothing unsettled can ship.
 
 So `check` is what catches a `"TODO"`; `build` may still write a sheet that shows one, so don't use the draft's sheet; the previews in step 3 are how you check the rest.
@@ -70,7 +70,7 @@ If the package replaces an older token file that projects still read, generate t
 
 ## 5. Approve the sheet
 
-Push the branch so the host renders the generated `README.md`, and send the user its link with one line per section: logos and lockups per theme, clear space, colour roles with contrast, type, spacing and radius, icons, component examples, brand assets, do and don't, install. Every picture shows each theme, labelled, so one look covers both.
+Push the branch so the host renders the generated `README.md`, and send the user its link with one line per section: logos and lockups per theme, clear space, colour roles with contrast, type, spacing and radius (or the pixel corners), icons, component examples, brand assets, do and don't, install. Every picture shows each theme, labelled, so one look covers both.
 
 Their changes go back through step 4. When they approve, the release (a tag that projects pin with `brandkit install owner/repo@tag`) follows the host's release rules; tagging is usually the user's.
 

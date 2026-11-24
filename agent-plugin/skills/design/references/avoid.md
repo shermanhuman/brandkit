@@ -8,7 +8,7 @@ Defaults that make a screen read as generated rather than designed. Check each m
 | Template chrome | ALL-CAPS eyebrow labels over headings, italic accent words inside headlines, `A · B · C` meta strings, `→` on every button, monospace for labels that aren't code | decoration that encodes nothing, and the same on every generated page |
 | Fake sequence | `01 / 02 / 03` numbering on items that aren't steps | numbering promises an order the content doesn't have |
 | Stat hero | a big number with three small stats as the page opener | it fits only screens whose job is that number |
-| Pills everywhere | every button and badge fully rounded | pill buttons and pill badges stop being distinguishable; use the brand's radius scale |
+| Pills everywhere | every button and badge fully rounded | pill buttons and pill badges stop being distinguishable; use the brand's radius scale, or its pixel corners when it has them |
 | Icon tile over heading | a coloured square holding an icon, stacked above each card's heading | it repeats the heading and pushes content down |
 | Side-stripe accent | a thick coloured left border marking cards or alerts | it reads as a status that isn't there; use the brand's alert roles |
 | Gradient text and glows | gradient-filled headings, glowing shadows on buttons or cards | they fail contrast checks and fight a brand's flat surfaces |

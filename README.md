@@ -4,7 +4,7 @@ brandkit turns a brand defined as [DTCG 2025.10](https://www.designtokens.org/TR
 
 - **`build`** writes `tokens.css`, `brand.css`, both DaisyUI 5 theme forms, `lint.json` and a GitHub README brand sheet (swatch SVGs, PNG specimens and SVG examples, every theme side by side or one after the other, labelled).
 - **`check`** checks the schema, the contrast (WCAG 2.x) of every declared colour pair and of every DaisyUI colour under its `-content` colour in each theme, and the brand rules, and fails on any token value left as `"TODO"`.
-- **`lint`** runs rules R1–R9 on CSS, HTML, HEEx, Elixir `~H` and Go `html/template` sources and on compiled CSS. It also runs as an edit-time agent hook.
+- **`lint`** runs rules R1–R10 on CSS, HTML, HEEx, Elixir `~H` and Go `html/template` sources and on compiled CSS. It also runs as an edit-time agent hook.
 - **`capture`** takes screenshots at 375/768/1280/1920 with axe-core, computed contrast and overflow per width. It works from a URL or from a browser an e2e script is driving.
 - **`install` / `update`** vendor a brand's built files and its README brand sheet into a project, pinned in `brandkit.lock`. `install --check` verifies them offline.
 
@@ -70,7 +70,8 @@ Its **Brand assets** section lists every file under the `install` entries except
   - `contrast` (`fg`, `bg`, `min`, `use`). `fg` and `bg` are colour token paths, or `daisyui:<colour>` (such as `daisyui:info-content`) for the token each theme's `com.mapleset.daisyui` mapping gives that colour, so one pair can check a different token in each theme. Without declaring anything, `check` and the sheet's Contrast table also test, in every theme, each of `primary`, `secondary`, `accent`, `neutral`, `info`, `success`, `warning` and `error` under its `-content` colour, and `base-content` on `base-100`, at 4.5:1 (normal text). A declared pair with the same `fg` and `bg` (`daisyui:accent-content` on `daisyui:accent`) replaces that automatic pair and its minimum: raise it, or set 3 for a colour kept to large type, and the sheet then draws that colour's component examples in large type (below 3, it leaves them out). A failure names the theme, the pair (with the tokens a `daisyui:` colour stands for) and the ratio;
   - `roles` (token, use);
   - `do`, `dont`;
-  - `opacityMin` (R8's threshold, default 70).
+  - `opacityMin` (R8's threshold, default 70);
+  - `corners`: `{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus"}` draws every corner as a pixel-drawn two-step staircase instead of a radius (the first row in two steps, the second in one). `small` is the step in CSS pixels on selector- and field-size components (buttons, badges, inputs, selects, textareas, checkboxes, toggles, kbd, boxed tabs, join items), `box` on cards, modals, alerts, dropdowns, menus and collapses. `focus` is the colour token of the focus ring. `check` wants whole pixels from 1 to 16 and a colour token for `focus`. See [Pixel corners](#pixel-corners).
 - `com.mapleset.css` on a token sets `name` (the custom property, without `--`) or a trailing `comment`.
 
 ## Commands
@@ -116,12 +117,35 @@ Private brand repositories need a token: `$GH_TOKEN`, `$GITHUB_TOKEN`, or `gh au
 | R7 | shadows and glows when the brand bans them, arbitrary ones (`shadow-[…]`) included; focus rings and `var(--…)` shadows are allowed |
 | R8 | low-opacity text roles such as `text-base-content/40` (a warning: check them with capture) |
 | R9 | Heroicons names in class lists and icon components' `name`, or inline SVG drawings in templates, when the brand's set is something else (DaisyUI's `hero-content` and `hero-overlay` are fine) |
+| R10 | smooth corners when the brand's corners are pixel-stepped: `rounded-*` classes (`rounded-lg`, `rounded-t-xl`, `rounded-full`, `rounded-[3px]`), also in compiled CSS, and `border-radius` declarations and `@theme` `--radius-*` values in CSS and `style` attributes. `rounded-none`, a radius of 0 and DaisyUI's `rounded-box`, `rounded-field` and `rounded-selector` (0 under pixel corners) are fine |
 
 To silence a finding, put `brand-lint-ignore R5: reason` anywhere on the same line or the line before; a comment is the usual place. The reason is required, and ignored findings are counted.
 
 Lint skips the folders `vendor/`, `node_modules/`, `deps/`, `_build/`, `dist/`, `testdata/` and `priv/static/`, and every folder whose name starts with a dot (`.git/`, `.elixir_ls/`). It also skips a file that is an unedited copy of one `brandkit.lock` pins, such as a `tokens.css` copied into `assets/`; an edited copy is linted. It prints how many files it checked and lists files given on the command line that it can't read; `-v` lists every file checked and skipped.
 
-Without `--config` it uses the `lint.json` of the brand in the nearest `brandkit.lock`, in the current folder or above. With no brand it exits 2, unless `--no-brand` is passed; then R6, R7 and R9 are off. It also exits 2 when it checked no files.
+Without `--config` it uses the `lint.json` of the brand in the nearest `brandkit.lock`, in the current folder or above. With no brand it exits 2, unless `--no-brand` is passed; then R6, R7, R9 and R10 are off. It also exits 2 when it checked no files.
+
+### Pixel corners
+
+With `corners` set to `pixel`, `build`:
+
+- sets DaisyUI's `--radius-selector`, `--radius-field` and `--radius-box` to 0 in both theme forms, and adds `--px-focus`, each theme's `focus` colour;
+- adds the corner rules to `brand.css`. `clip-path` cuts DaisyUI's components into the staircase. On your own elements, use `px-corners-sm` or `px-corners-lg`.
+
+`clip-path` also cuts the border at each corner and anything drawn outside the element, so `brand.css` draws them back:
+
+- **Outline.** A `::after` layer paints the stepped outline in the element's own border colour and style (`border-color: inherit`), inside the padding box. It follows outline buttons, `card-border`, Tailwind `border-*` colours, and hover and checked states. Text inputs and textareas can't have pseudo-elements, so they get the step pixels as background layers in DaisyUI's `--input-color` instead. The outline width is `--px-bw`, a registered property that doesn't inherit. It's set to DaisyUI's `--border` on DaisyUI's bordered components, to the width of Tailwind's `border`, `border-2`, `border-4` and `border-8` on stepped elements, and is 0 elsewhere, so an element without a border gets no outline. For any other border width, set `--px-bw` yourself.
+- **Focus ring.** On focus (keyboard focus, or any focus on fields, as DaisyUI does), the clip takes in a stepped ring 2px wide outside the element: at DaisyUI's 2px gap, or one step out when the step is larger. The outline is drawn there in `--px-focus`, falling back to `base-content`. This works on inputs too.
+- **Join items.** Inside a `join`, items keep their inner corners square, so the group reads as one stepped shape (horizontal and `join-vertical`, left to right only).
+
+The radius tokens stay in `brand.css` but no longer shape anything. The README sheet draws the steps in place of the radius picture, and the component specimens are drawn with them.
+
+Limits:
+
+- `select` gets its outline from `::after`, which Chrome draws with `appearance: base-select`. Browsers that don't support that show the stepped shape without the outline pixels on the steps.
+- Elements that scroll (a `modal-box` or `menu` with its own scrollbar) carry the outline layer with their content.
+- A `.btn` on an `input` (a submit button) has no `::after`, so it gets no outline pixels on the steps.
+- Radios stay round, and DaisyUI's other rounded parts (avatars, `rounded-full` utilities) are left to R10.
 
 ### Capture
 

@@ -31,7 +31,8 @@ Take these from the plan or issue when one exists; ask only what they don't answ
 
 - `README.md` and its sheet images: the brand sheet, including its do and don't;
 - the generated CSS in `export/ui/` (`tokens.css`, `brand.css`, the DaisyUI theme files) and `export/lint.json`;
-- the theme names and which one is the default.
+- the theme names and which one is the default;
+- the corner style. When `lint.json` has `"corners": "pixel"`, the brand cuts corners into pixel steps instead of rounding them: load `brand.css` after the DaisyUI theme, leave DaisyUI's components to it, put `px-corners-sm` (controls) or `px-corners-lg` (panels) on your own boxes, and never add `rounded-*` or `border-radius` (lint R10). A custom box with a border other than Tailwind's `border`, `border-2`, `border-4` or `border-8` sets `--px-bw` to its width, or its steps lose their outline.
 
 **No lock:** if the brand's package already exists (the plan, the host's rules or the user say where), run `brandkit install owner/repo@tag`, commit `vendor/brand/` and `brandkit.lock`, and go on. Only when no package exists, stop and say so: the brand has to be defined first, with the `brand` skill and the user. Don't derive a palette from the existing CSS, a screenshot or the product's category.
 

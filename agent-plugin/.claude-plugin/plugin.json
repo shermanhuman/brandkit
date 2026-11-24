@@ -1,7 +1,7 @@
 {
   "name": "brandkit",
   "version": "0.1.0",
-  "description": "Brand and design skills on brandkit packages (define a brand as DTCG tokens; design UI as three checked mockups, a pick, a build and a screenshot review), plus an edit-time warning when UI code uses raw colours, sizes, fonts, shadows or icons outside the brand (brandkit lint R1–R9).",
+  "description": "Brand and design skills on brandkit packages (define a brand as DTCG tokens; design UI as three checked mockups, a pick, a build and a screenshot review), plus an edit-time warning when UI code uses raw colours, sizes, fonts, shadows or icons outside the brand (brandkit lint R1–R10).",
   "author": { "name": "Sherman Boyd" },
   "homepage": "https://github.com/shermanhuman/brandkit",
   "repository": "https://github.com/shermanhuman/brandkit",
