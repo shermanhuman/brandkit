@@ -2,6 +2,7 @@ package check
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -241,6 +242,128 @@ func TestCorners(t *testing.T) {
 			t.Errorf("%s: want no corners findings, got:\n%v", tc.corners, Brand(b))
 		} else if tc.sev != "" && !ok {
 			t.Errorf("%s: no corners %s containing %q in:\n%v", tc.corners, tc.sev, tc.msg, Brand(b))
+		}
+	}
+}
+
+// TestArc: with the brand arc declared, check warns (never errors) for
+// each chromatic colour off every stop, naming the token, its hue and the
+// nearest stop; a declared exception, on the token or on an alias of it,
+// is let through, and neutrals are skipped. A broken arc is an error.
+func TestArc(t *testing.T) {
+	arc := `{"start": 66, "step": -43.7, "exceptions": [{"token": "palette.amber-200", "reason": "kept yellow for warnings"}, {"token": "color.accent", "reason": "night accent kept warm"}]}`
+	dir := copyDir(t, filepath.Join("..", "..", "testdata", "brands", "base"))
+	edit(t, filepath.Join(dir, "tokens", "semantic.tokens.json"), `"shadows": "none",`, `"shadows": "none", "arc": `+arc+`,`)
+	b, err := brand.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]int{}
+	for _, f := range Brand(b) {
+		if f.Rule != "arc" {
+			continue
+		}
+		if f.Severity != "warning" {
+			t.Errorf("arc finding isn't a warning: %s", f)
+		}
+		tok, _, _ := strings.Cut(f.Message, " ")
+		got[tok]++
+		if tok == "palette.green-300" && !strings.Contains(f.Message, "palette.green-300 (hue 150.0°) is off the brand arc: the nearest stop is 6 at 163.8°, 13.8° away (tolerance 8°)") {
+			t.Errorf("message: %s", f.Message)
+		}
+	}
+	// Off the arc in both themes (the palette is shared).
+	for _, tok := range []string{"palette.green-300", "palette.green-800", "palette.teal-300", "palette.blue-700"} {
+		if got[tok] != 2 {
+			t.Errorf("%s: %d warnings, want one per theme", tok, got[tok])
+		}
+	}
+	// An exception on an alias covers the token it points at in that
+	// theme: color.accent is coral-300 at night and coral-700 by day.
+	if got["palette.coral-300"] != 1 {
+		t.Errorf("palette.coral-300: %d warnings, want one (day, where color.accent isn't it)", got["palette.coral-300"])
+	}
+	// On a stop, excepted, neutral, or an alias.
+	for _, tok := range []string{"palette.red-300", "palette.blue-300", "palette.amber-800", "palette.amber-200", "palette.ink-800", "color.success"} {
+		if got[tok] != 0 {
+			t.Errorf("%s: %d warnings, want none", tok, got[tok])
+		}
+	}
+
+	for _, tc := range []struct{ arc, msg string }{
+		{`{"start": 66, "step": 0}`, "arc step is 0"},
+		{`{"start": 400, "step": -43.7}`, "arc start is 400"},
+		{`{"start": 66, "step": -43.7, "tolerance": 30}`, "arc tolerance is 30"},
+		{`{"start": 66, "step": -43.7, "stops": 9}`, "arc stops is 9"},
+		{`{"start": 66, "step": -43.7, "exceptions": [{"token": "palette.nope", "reason": "x"}]}`, "arc exception palette.nope isn't a colour token"},
+		{`{"start": 66, "step": -43.7, "exceptions": [{"token": "palette.amber-200"}]}`, "arc exception palette.amber-200 has no reason"},
+	} {
+		dir := copyDir(t, filepath.Join("..", "..", "testdata", "brands", "base"))
+		edit(t, filepath.Join(dir, "tokens", "semantic.tokens.json"), `"shadows": "none",`, `"shadows": "none", "arc": `+tc.arc+`,`)
+		b, err := brand.Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ok := false
+		for _, f := range Brand(b) {
+			if f.Rule == "arc" && f.Severity == "error" && strings.Contains(f.Message, tc.msg) {
+				ok = true
+			}
+		}
+		if !ok {
+			t.Errorf("%s: no arc error containing %q in:\n%v", tc.arc, tc.msg, Brand(b))
+		}
+	}
+}
+
+// TestBreakdownArc runs check on the real Breakdown colours
+// (breakdown-sites .plan/design_tokens.md, "The brand arc"), light and
+// dark: peach on stop 0, coral on 1, purple on 3, blue on 4, green on 6,
+// and magenta at 359°, off stop 2 on purpose and declared. Then without
+// the exception magenta is the one warning, naming stop 2.
+func TestBreakdownArc(t *testing.T) {
+	colours := map[string]string{
+		"peach": "#ffca95", "coral": "#ff7873", "magenta": "#e22f80",
+		"purple": "#8250df", "purple-dark": "#8957e5",
+		"blue": "#0969da", "blue-dark": "#58a6ff",
+		"green": "#097c58", "green-dark": "#0e9e71",
+		"fg": "#1f2328", "canvas": "#ffffff", // neutrals
+	}
+	var group strings.Builder
+	group.WriteString(`"bd": {"$type": "color"`)
+	for name, h := range colours {
+		var c [3]int
+		fmt.Sscanf(h, "#%02x%02x%02x", &c[0], &c[1], &c[2])
+		fmt.Fprintf(&group, `, "%s": {"$value": {"colorSpace": "srgb", "components": [%g, %g, %g], "hex": "%s"}}`, name, float64(c[0])/255, float64(c[1])/255, float64(c[2])/255, h)
+	}
+	group.WriteString("},\n  \"palette\": {")
+	run := func(exceptions string) []Finding {
+		t.Helper()
+		dir := copyDir(t, filepath.Join("..", "..", "testdata", "brands", "base"))
+		edit(t, filepath.Join(dir, "tokens", "primitives.tokens.json"), `"palette": {`, group.String())
+		edit(t, filepath.Join(dir, "tokens", "semantic.tokens.json"), `"shadows": "none",`, `"shadows": "none", "arc": {"start": 66, "step": -43.7, "exceptions": [`+exceptions+`]},`)
+		b, err := brand.Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []Finding
+		for _, f := range Brand(b) {
+			if f.Rule == "arc" && strings.HasPrefix(f.Message, "bd.") {
+				out = append(out, f)
+			}
+		}
+		return out
+	}
+	if fs := run(`{"token": "bd.magenta", "reason": "a redder magenta reads as an error"}`); len(fs) != 0 {
+		t.Errorf("Breakdown's colours are on the arc or declared, got:\n%v", fs)
+	}
+	fs := run("")
+	if len(fs) != 2 { // one per theme
+		t.Fatalf("want magenta off the arc in each theme, got:\n%v", fs)
+	}
+	for _, f := range fs {
+		if f.Severity != "warning" || !strings.HasPrefix(f.Message, "bd.magenta (hue 359.2°) is off the brand arc: the nearest stop is 2 at 338.6°, 20.6° away") {
+			t.Errorf("magenta: %s", f)
 		}
 	}
 }

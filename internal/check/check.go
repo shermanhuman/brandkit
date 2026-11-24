@@ -5,6 +5,7 @@ package check
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -70,6 +71,7 @@ func Brand(b *brand.Brand) []Finding {
 	c.icons(rules)
 	c.roles(rules)
 	c.corners(rules)
+	c.arc(rules)
 	return c.out
 }
 
@@ -378,6 +380,64 @@ func (c *checker) corners(r *brand.Rules) {
 	for _, th := range c.b.Themes {
 		if t := th.Tokens.Get(k.Focus); t == nil || t.Type != "color" {
 			c.add("corners", "error", th.Name, "corners focus %s isn't a colour token", k.Focus)
+		}
+	}
+}
+
+// arc checks the brand arc: a usable path, exceptions that name colour
+// tokens with a reason, then a warning for each chromatic colour whose
+// hue is off every stop and isn't a declared exception.
+func (c *checker) arc(r *brand.Rules) {
+	a := r.Arc
+	if a == nil {
+		return
+	}
+	bad := false
+	if a.Step == 0 || math.Abs(a.Step) >= 180 {
+		c.add("arc", "error", "", "arc step is %v; give the hue step in degrees, more than 0 and less than 180 either way (negative runs down the wheel)", a.Step)
+		bad = true
+	}
+	if a.Start < 0 || a.Start >= 360 {
+		c.add("arc", "error", "", "arc start is %v; give a hue from 0 to 360", a.Start)
+		bad = true
+	}
+	if a.Stops < 0 || a.Step != 0 && float64(a.Stops)*math.Abs(a.Step) > 360+1e-9 {
+		c.add("arc", "error", "", "arc stops is %d; the stops must fit in one turn of the wheel", a.Stops)
+		bad = true
+	}
+	if a.Tolerance < 0 || a.Step != 0 && a.Tol() >= math.Abs(a.Step)/2 {
+		c.add("arc", "error", "", "arc tolerance is %v; give degrees, more than 0 and less than half the step", a.Tol())
+		bad = true
+	}
+	if a.MinChroma < 0 || a.MinChroma >= 0.4 {
+		c.add("arc", "error", "", "arc minChroma is %v; give an OKLCH chroma from 0 to 0.4 (neutrals sit below about 0.03)", a.MinChroma)
+		bad = true
+	}
+	for _, e := range a.Exceptions {
+		if strings.TrimSpace(e.Reason) == "" {
+			c.add("arc", "error", "", "arc exception %s has no reason; say why it sits off the arc", e.Token)
+		}
+		for _, th := range c.b.Themes {
+			if t := th.Tokens.Get(e.Token); t == nil || t.Type != "color" {
+				c.add("arc", "error", th.Name, "arc exception %s isn't a colour token", e.Token)
+			}
+		}
+	}
+	if bad {
+		return
+	}
+	for _, th := range c.b.Themes {
+		places, err := build.ArcPlaces(th, a)
+		if err != nil {
+			c.add("arc", "error", th.Name, "%v", err)
+			continue
+		}
+		for _, p := range places {
+			if p.On || p.Exception != "" {
+				continue
+			}
+			c.add("arc", "warning", th.Name, "%s (hue %.1f°) is off the brand arc: the nearest stop is %d at %.1f°, %.1f° away (tolerance %s°). Move it to a free stop or declare it an exception with a reason",
+				p.Token, p.Hue, p.Stop, a.StopHue(p.Stop), p.Off, brand.Num(a.Tol()))
 		}
 	}
 }

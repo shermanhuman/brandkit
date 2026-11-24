@@ -53,7 +53,7 @@ The fixture brands in [`testdata/brands/base`](testdata/brands/base) and [`testd
 | `fonts[]` | | `family`, `css` (the `@font-face` file), `license` |
 | `install` | | extra files or folders `brandkit install` vendors (tokens, fonts, assets). The generated files, `brandkit.json`, the README and its sheet folder always go. Every path must stay inside the package |
 
-**The README brand sheet** shows every picture in every theme, labelled: the clear space, spacing, radius and icon examples as one SVG each with a panel per theme, and the type and component specimens as one PNG per theme, 880 pixels wide so text shows at true size in GitHub's README column. Spacing steps are drawn at true size as the gap between two blocks; each radius on a button, a field and a card. For a brand whose icon set is Lucide, it draws twelve common icons from the Lucide release vendored in [`internal/build/lucide`](internal/build/lucide/README.md); other sets are named only.
+**The README brand sheet** shows every picture in every theme, labelled: the clear space, spacing, radius and icon examples as one SVG each with a panel per theme, and the type and component specimens as one PNG per theme, 880 pixels wide so text shows at true size in GitHub's README column. Spacing steps are drawn at true size as the gap between two blocks; each radius on a button, a field and a card; a brand's pixel corners, for marketing pages, on the components each step shapes. With a brand arc, the colour section lists the arc's stops and the colours on each. For a brand whose icon set is Lucide, it draws twelve common icons from the Lucide release vendored in [`internal/build/lucide`](internal/build/lucide/README.md); other sets are named only.
 
 Its **Brand assets** section lists every file under the `install` entries except token files (`*.tokens.json`, `*.resolver.json`), Markdown, dotfiles, the README, its sheet folder and the files brandkit generates. Inside a base brand installed under the package (a folder that holds its own `brandkit.json`, such as `vendor/brand/<base>/`), only that base's own `install` files show, under the same exclusions, headed with the base's name. Files are grouped by folder in `install` order; files whose names differ only in extension or a `-1x`/`-2x`/`@2x` scale suffix share a row. Each row has the file links and a one-line use (lockup for which theme, favicon, manifest icon, font file and the stylesheet that loads it, licence, and so on). SVG, PNG, JPEG and GIF files get a preview: opaque images as they are, transparent ones as a thumbnail in the sheet folder (`asset-<hash of the path>.svg`) on the ground of the theme they belong to (the theme a `lockup` names, otherwise the theme whose `base-100` contrasts most with the image's colours). Of a row's rasters, the thumbnail uses the smallest that covers it at 2x, downscaled to that if it's still larger. A `head.html` of 2 KB or less is printed below its folder's table.
 
@@ -72,6 +72,7 @@ Its **Brand assets** section lists every file under the `install` entries except
   - `do`, `dont`;
   - `opacityMin` (R8's threshold, default 70);
   - `corners`: `{"style": "pixel", "small": 2, "box": 4, "focus": "color.focus", "scope": "[data-corners=\"pixel\"]", "pages": ["site/**"]}` draws every corner on marketing pages as a pixel-drawn two-step staircase instead of a radius (the first row in two steps, the second in one). Product UI (apps, dashboards) keeps the theme's smooth radius. `small` is the step in CSS pixels on selector- and field-size components (buttons, badges, inputs, selects, textareas, checkboxes, toggles, kbd, boxed tabs, join items), `box` on cards, modals, alerts, dropdowns, menus and collapses. `focus` is the colour token of the focus ring. `scope` is what a marketing page puts on its `<html>` or `<body>`: an attribute selector or a class (default `[data-corners="pixel"]`). `pages` are path globs, relative to the project root, of the marketing page sources that lint rule R10 checks; with none, R10 is off. `check` wants whole pixels from 1 to 16, a colour token for `focus`, an attribute or class `scope` and well-formed `pages`. See [Pixel corners](#pixel-corners).
+  - `arc` (optional): `{"start": 66, "step": -43.7, "tolerance": 8, "minChroma": 0.03, "exceptions": [{"token": "color.magenta", "reason": "a redder magenta reads as an error"}]}` puts every chromatic colour on one OKLCH hue path. See [Brand arc](#brand-arc).
 - `com.mapleset.css` on a token sets `name` (the custom property, without `--`) or a trailing `comment`.
 
 ## Commands
@@ -151,6 +152,21 @@ Limits:
 - Elements that scroll (a `modal-box` or `menu` with its own scrollbar) carry the outline layer with their content.
 - A `.btn` on an `input` (a submit button) has no `::after`, so it gets no outline pixels on the steps.
 - Radios stay round, and DaisyUI's other rounded parts (avatars, `rounded-full` utilities) are left to R10.
+
+### Brand arc
+
+A brand can put every chromatic colour on one path around the OKLCH hue wheel, in equal steps, so the palette reads as one family (the Breakdown brands start at peach, 66°, and step 43.7° down the wheel). Declare `arc` in the rules:
+
+- `start`: the hue of stop 0, in degrees.
+- `step`: the hue step in degrees, signed: negative runs down the wheel. Stop *n* is at `start + step × n`, wrapped to 0–360.
+- `stops` (optional): how many stops; by default as many as fit in one turn (8 for 43.7°).
+- `tolerance` (optional, default 8): how many degrees a hue may sit from its stop.
+- `minChroma` (optional, default 0.03): only colour tokens with an OKLCH chroma above it count, so neutrals are skipped.
+- `exceptions`: tokens kept off the path on purpose, each with a `reason`. An exception on an alias (a role such as `color.error`) covers the token it points at in each theme.
+
+`check` warns, and doesn't fail, for each chromatic colour token whose hue is more than the tolerance from every stop and isn't an exception, naming the token, its hue and the nearest stop. Aliases are checked through the token they point at; tokens written in OKLCH use their authored hue. It errors on an arc it can't use: a step of 0 or 180° or more, a start outside 0–360, more stops than fit in a turn, a tolerance of half the step or more, or an exception that isn't a colour token or has no reason.
+
+The README sheet's colour section lists the stops, which tokens sit on each per theme, the free stops, the exceptions and anything off the arc. To add a colour, pick the free stop nearest the hue it needs.
 
 ### Capture
 

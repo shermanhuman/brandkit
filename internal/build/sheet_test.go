@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/shermanhuman/brandkit/internal/brand"
 )
 
 // TestSheetShowsEveryTheme: no picture swaps on the reader's colour
@@ -327,5 +329,40 @@ func TestLucideChecksums(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join("lucide", "LICENSE")); err != nil {
 		t.Error(err)
+	}
+}
+
+// TestSheetArc: with a brand arc, the colour section lists each stop and
+// the colours on it per theme, free stops, the declared exceptions with
+// their reasons, and the colours off the arc. Without one, no section.
+func TestSheetArc(t *testing.T) {
+	b := load(t, "base")
+	r, err := b.Default().Rules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &sheet{b: b, rules: r}
+	if err := s.arc(); err != nil || s.w.Len() != 0 {
+		t.Fatalf("an arc section without an arc: %v %q", err, s.w.String())
+	}
+	r.Arc = &brand.Arc{Start: 66, Step: -43.7, Exceptions: []brand.ArcException{{Token: "palette.amber-200", Reason: "kept yellow | for warnings"}}}
+	if err := s.arc(); err != nil {
+		t.Fatal(err)
+	}
+	out := s.w.String()
+	for _, want := range []string{
+		"### Brand arc",
+		"stop *n* at 66° − 43.7° × *n*, wrapped to 0–360°, within 8°",
+		"pick the free stop nearest the hue it needs",
+		"| Stop | Hue | Night | Day |",
+		"| 0 | 66° | `palette.amber-800` 70° | `palette.amber-800` 70° |",
+		"| 1 | 22.3° | `palette.coral-700` 30°<br>`palette.red-300` 22°<br>`palette.red-700` 25° |",
+		"| 2 | 338.6° | free | free |",
+		"| Exceptions | | `palette.amber-200` 90°: kept yellow \\| for warnings |",
+		"| **Off the arc** | | `palette.teal-300` 190°, 18° from stop 5<br>",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the arc section lacks %q:\n%s", want, out)
+		}
 	}
 }

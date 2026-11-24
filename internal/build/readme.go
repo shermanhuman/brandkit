@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html"
+	"math"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -270,6 +271,9 @@ func (s *sheet) colour() error {
 		}
 		s.p("\n")
 	}
+	if err := s.arc(); err != nil {
+		return err
+	}
 	// The rest of the palette, collapsed.
 	inRoles := map[string]bool{}
 	for _, r := range roles {
@@ -301,6 +305,83 @@ func (s *sheet) colour() error {
 		s.p("\n</details>\n")
 	}
 	s.p("\n")
+	return nil
+}
+
+// arc lists the brand arc's stops and the chromatic colours on each, per
+// theme, then the declared exceptions and the colours off the arc.
+func (s *sheet) arc() error {
+	a := s.rules.Arc
+	if a == nil {
+		return nil
+	}
+	sign, step := "+", a.Step
+	if step < 0 {
+		sign, step = "−", -step
+	}
+	s.p("\n### Brand arc\n\nEvery chromatic colour (OKLCH chroma above %s) sits on one hue path: stop *n* at %s° %s %s° × *n*, wrapped to 0–360°, within %s°. ",
+		brand.Num(a.Chroma()), brand.Num(a.Start), sign, brand.Num(step), brand.Num(a.Tol()))
+	s.p("To add a colour, pick the free stop nearest the hue it needs. `brandkit check` warns about a colour off every stop that isn't a declared exception.\n\n| Stop | Hue |")
+	for _, th := range s.b.Themes {
+		s.p(" %s |", th.Config.Label)
+	}
+	s.p("\n|---|---|%s\n", strings.Repeat("---|", len(s.b.Themes)))
+	places := make([][]ArcPlace, len(s.b.Themes))
+	for i, th := range s.b.Themes {
+		ps, err := ArcPlaces(th, a)
+		if err != nil {
+			return fmt.Errorf("theme %s: %w", th.Name, err)
+		}
+		places[i] = ps
+	}
+	cell := func(i int, keep func(ArcPlace) bool, note func(ArcPlace) string) string {
+		var out []string
+		for _, p := range places[i] {
+			if keep(p) {
+				out = append(out, fmt.Sprintf("`%s` %.0f°%s", p.Token, p.Hue, note(p)))
+			}
+		}
+		if len(out) == 0 {
+			return ""
+		}
+		return strings.Join(out, "<br>")
+	}
+	none := func(ArcPlace) string { return "" }
+	for n := 0; n < a.StopCount(); n++ {
+		s.p("| %d | %s° |", n, brand.Num(math.Round(a.StopHue(n)*10)/10))
+		for i := range s.b.Themes {
+			c := cell(i, func(p ArcPlace) bool { return p.On && p.Stop == n }, none)
+			if c == "" {
+				c = "free"
+			}
+			s.p(" %s |", c)
+		}
+		s.p("\n")
+	}
+	rows := []struct {
+		name string
+		keep func(ArcPlace) bool
+		note func(ArcPlace) string
+	}{
+		{"Exceptions", func(p ArcPlace) bool { return !p.On && p.Exception != "" }, func(p ArcPlace) string { return ": " + strings.ReplaceAll(p.Exception, "|", "\\|") }},
+		{"**Off the arc**", func(p ArcPlace) bool { return !p.On && p.Exception == "" }, func(p ArcPlace) string { return fmt.Sprintf(", %.0f° from stop %d", p.Off, p.Stop) }},
+	}
+	for _, r := range rows {
+		cells := make([]string, len(s.b.Themes))
+		empty := true
+		for i := range s.b.Themes {
+			cells[i] = cell(i, r.keep, r.note)
+			empty = empty && cells[i] == ""
+		}
+		if empty {
+			continue
+		}
+		s.p("| %s | |", r.name)
+		for _, c := range cells {
+			s.p(" %s |", c)
+		}
+		s.p("\n")
+	}
 	return nil
 }
 

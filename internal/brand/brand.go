@@ -5,6 +5,7 @@ package brand
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -376,6 +377,8 @@ type Rules struct {
 	OpacityMin int `json:"opacityMin,omitempty"`
 	// Corners adds pixel-stepped corners on marketing pages.
 	Corners *Corners `json:"corners,omitempty"`
+	// Arc puts every chromatic colour on one OKLCH hue path.
+	Arc *Arc `json:"arc,omitempty"`
 }
 
 // Corners is how the brand draws corners on marketing pages. Style
@@ -432,6 +435,84 @@ func (c *Corners) ScopeAttr() (name, value string, ok bool) {
 		return "class", m[1], true
 	}
 	return "", "", false
+}
+
+// Arc is the brand's hue path: every chromatic colour sits on a stop of
+// one path around the OKLCH hue wheel. Stop n is at Start + Step × n,
+// wrapped to 0–360; a negative Step runs down the wheel. Stops is how
+// many there are (default: as many as fit in one turn). A colour token
+// counts when its OKLCH chroma is above MinChroma (default
+// DefaultArcMinChroma), so neutrals are skipped; it is on the path when
+// its hue is within Tolerance degrees (default DefaultArcTolerance) of a
+// stop. Exceptions are tokens kept off the path on purpose, each with
+// its reason.
+type Arc struct {
+	Start      float64        `json:"start"`
+	Step       float64        `json:"step"`
+	Stops      int            `json:"stops,omitempty"`
+	Tolerance  float64        `json:"tolerance,omitempty"`
+	MinChroma  float64        `json:"minChroma,omitempty"`
+	Exceptions []ArcException `json:"exceptions,omitempty"`
+}
+
+// ArcException is a colour token kept off the arc, and why.
+type ArcException struct {
+	Token  string `json:"token"`
+	Reason string `json:"reason"`
+}
+
+// Arc defaults.
+const (
+	DefaultArcTolerance = 8.0
+	DefaultArcMinChroma = 0.03
+)
+
+// StopCount is the number of stops: Stops, or as many as fit in one turn.
+func (a *Arc) StopCount() int {
+	if a.Stops > 0 {
+		return a.Stops
+	}
+	if a.Step == 0 {
+		return 1
+	}
+	return max(1, int(360/math.Abs(a.Step)+1e-9))
+}
+
+// Tol is the tolerance in degrees.
+func (a *Arc) Tol() float64 {
+	if a.Tolerance > 0 {
+		return a.Tolerance
+	}
+	return DefaultArcTolerance
+}
+
+// Chroma is the chroma above which a colour counts.
+func (a *Arc) Chroma() float64 {
+	if a.MinChroma > 0 {
+		return a.MinChroma
+	}
+	return DefaultArcMinChroma
+}
+
+// StopHue is the hue of stop n, in [0, 360).
+func (a *Arc) StopHue(n int) float64 { return WrapHue(a.Start + a.Step*float64(n)) }
+
+// WrapHue wraps a hue into [0, 360).
+func WrapHue(h float64) float64 {
+	h = math.Mod(h, 360)
+	if h < 0 {
+		h += 360
+	}
+	if h >= 360-1e-9 {
+		h = 0
+	}
+	return h
+}
+
+// HueDist is the distance between two hues around the wheel, 0 to 180.
+func HueDist(a, b float64) float64 {
+	d := math.Abs(WrapHue(a) - WrapHue(b))
+	return math.Min(d, 360-d)
 }
 
 // ClearSpace is the lockup's clear-space rule.
