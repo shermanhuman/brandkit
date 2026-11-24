@@ -5,3 +5,13 @@
 .tile {
   border-radius: 0 0 0 0;
 }
+
+.forced {
+  border-radius: 0 !important;
+}
+
+.flat {
+  border-top-left-radius: 0px;
+  border-radius: var(--radius-field, 0);
+  border-bottom-right-radius: var(--tile-radius, 0px) !important;
+}

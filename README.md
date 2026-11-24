@@ -118,7 +118,7 @@ Private brand repositories need a token: `$GH_TOKEN`, `$GITHUB_TOKEN`, or `gh au
 | R7 | shadows and glows when the brand bans them, arbitrary ones (`shadow-[…]`) included; focus rings and `var(--…)` shadows are allowed |
 | R8 | low-opacity text roles such as `text-base-content/40` (a warning: check them with capture) |
 | R9 | Heroicons names in class lists and icon components' `name`, or inline SVG drawings in templates, when the brand's set is something else (DaisyUI's `hero-content` and `hero-overlay` are fine) |
-| R10 | smooth corners on a marketing page when the brand's corners are pixel-stepped there (files matching the `corners` `pages` globs; off without them): `rounded-*` classes (`rounded-lg`, `rounded-t-xl`, `rounded-full`, `rounded-[3px]`), also in compiled CSS, and `border-radius` declarations and `@theme` `--radius-*` values in CSS and `style` attributes. `rounded-none`, a radius of 0 and DaisyUI's `rounded-box`, `rounded-field` and `rounded-selector` (0 under pixel corners) are fine |
+| R10 | smooth corners on a marketing page when the brand's corners are pixel-stepped there (files matching the `corners` `pages` globs; off without them): `rounded-*` classes (`rounded-lg`, `rounded-t-xl`, `rounded-full`, `rounded-[3px]`), also in compiled CSS, and `border-radius` declarations and `@theme` `--radius-*` values in CSS and `style` attributes. `rounded-none`, a radius of 0 (also with `!important`, or as a `var()` whose fallback is 0) and DaisyUI's `rounded-box`, `rounded-field` and `rounded-selector` (0 under pixel corners) are fine |
 
 To silence a finding, put `brand-lint-ignore R5: reason` anywhere on the same line or the line before; a comment is the usual place. The reason is required, and ignored findings are counted.
 

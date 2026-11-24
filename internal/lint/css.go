@@ -302,21 +302,65 @@ func (l *linter) decl(prop, val string, off int, w where, focus bool, text strin
 var radiusPropRe = regexp.MustCompile(`^border(?:-[a-z]+){0,2}-radius$`)
 
 // squareRadius reports whether a border-radius value keeps corners square
-// under pixel corners: 0, a CSS-wide keyword, or DaisyUI's radius
-// variables, which pixel corners set to 0.
+// under pixel corners: a zero length, a CSS-wide keyword, DaisyUI's radius
+// variables (which pixel corners set to 0), or any var() whose fallback is
+// a zero length. !important doesn't change that.
 func squareRadius(v string) bool {
 	v = strings.TrimSpace(strings.ToLower(v))
+	if i := strings.Index(v, "!"); i >= 0 && strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(v[i+1:]), "important")) == "" {
+		v = strings.TrimSpace(v[:i])
+	}
 	if v == "initial" || v == "unset" || v == "inherit" || v == "revert" || v == "revert-layer" {
 		return true
 	}
-	for _, f := range strings.Fields(strings.ReplaceAll(v, "/", " ")) {
-		switch f {
-		case "0", "0px", "0rem", "0%", "var(--radius-selector)", "var(--radius-field)", "var(--radius-box)":
-		default:
+	parts := radiusParts(v)
+	if len(parts) == 0 {
+		return false
+	}
+	for _, f := range parts {
+		if !squarePart(f) {
 			return false
 		}
 	}
 	return true
+}
+
+// radiusParts splits a border-radius value at its top-level spaces and
+// slashes, keeping var(…) whole.
+func radiusParts(v string) []string {
+	var out []string
+	depth, start := 0, 0
+	for i, r := range v + " " {
+		switch {
+		case r == '(':
+			depth++
+		case r == ')':
+			depth--
+		case depth == 0 && (r == ' ' || r == '\t' || r == '\n' || r == '/'):
+			if f := strings.TrimSpace(v[start:i]); f != "" {
+				out = append(out, f)
+			}
+			start = i + 1
+		}
+	}
+	return out
+}
+
+var zeroLenRe = regexp.MustCompile(`^[+-]?(?:0+\.?0*|\.0+)(?:[a-z]+|%)?$`)
+
+func squarePart(f string) bool {
+	if zeroLenRe.MatchString(f) {
+		return true
+	}
+	if !strings.HasPrefix(f, "var(") || !strings.HasSuffix(f, ")") {
+		return false
+	}
+	name, fallback, ok := strings.Cut(f[len("var("):len(f)-1], ",")
+	switch strings.TrimSpace(name) {
+	case "--radius-selector", "--radius-field", "--radius-box":
+		return true
+	}
+	return ok && squarePart(strings.TrimSpace(fallback))
 }
 
 func noneValue(v string) bool {
